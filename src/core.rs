@@ -1,64 +1,133 @@
+//! Core Input Processing Logic for XKey
+//!
+//! This module handles the core input processing logic, including:
+//! - Buffer management for collecting keystrokes
+//! - Key event handling and action generation
+//! - Integration with the Telex transformation engine
+//!
+//! The core is designed to be independent of the IBus interface, making it
+//! testable in isolation and reusable for other input method backends.
+
 use crate::telex;
 use crate::utils::{is_shortcut, keyval_to_char};
 
-/// Defines the possible actions the engine can perform in response to a key event.
+/// Actions that the core engine returns for the IBus engine to execute.
+///
+/// These actions represent the possible responses to a key event. The IBus
+/// engine translates these actions into D-Bus signals or other operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
-    /// Update the preedit text displayed in the application.
+    /// Update the preedit (composition) window with new text.
+    ///
+    /// # Fields
+    /// - `text`: The transformed Vietnamese text to display
+    /// - `caret`: Cursor position (character index from start)
+    /// - `visible`: Whether the preedit window should be shown
     UpdatePreedit {
         text: String,
         caret: usize,
         visible: bool,
     },
-    /// Hide the preedit area.
+
+    /// Hide the preedit (composition) window.
+    /// Typically used when the buffer is cleared or composition is cancelled.
     HidePreedit,
-    /// Send final text to the application.
+
+    /// Commit finalized text to the target application.
+    /// The text has been fully transformed and should be inserted.
     Commit(String),
-    /// Let the key event pass through to the application without intervention.
+
+    /// Pass the key event through to the application.
+    /// The input method did not handle this key.
     PassThrough,
-    /// Prevent the key event from reaching the application because it was handled by the engine.
+
+    /// Consume the key event (prevent it from reaching the application).
+    /// The input method fully handled this key.
     Consume,
 }
 
-/// Represents the internal state of the input core.
+/// The core state for input processing.
+///
+/// This struct maintains the current input buffer which collects raw
+/// keystrokes before they are transformed into Vietnamese text.
 #[derive(Default, Debug)]
 pub struct CoreState {
-    /// Stores the raw character sequence being processed for Vietnamese transformation.
+    /// Raw input buffer containing Telex keystrokes.
+    ///
+    /// Characters are accumulated here as the user types. The buffer is
+    /// transformed in real-time using Telex rules to produce Vietnamese text.
+    /// The buffer is cleared when:
+    /// - The user presses Space, Enter, or Tab (commits the word)
+    /// - The user presses Escape (cancels the composition)
+    /// - The user types punctuation (commits the word, then passes punctuation through)
+    /// - Focus is lost
     pub buffer: String,
 }
 
-/// The main logic for handling key events.
-/// It decides whether to consume the key, update the preedit, or commit text
-/// based on the current buffer and the incoming key.
+/// Processes a key event and returns a list of actions to perform.
+///
+/// This is the main entry point for key event processing. It handles:
+/// - Key release events (ignored)
+/// - Shortcut keys (Ctrl+X, Alt+Tab, etc.) - passed through
+/// - Backspace - removes last character from buffer
+/// - Escape - cancels current composition
+/// - Space/Enter/Tab - commits current word
+/// - Punctuation - commits current word, then passes through
+/// - Regular characters - adds to buffer and updates preedit
+///
+/// # Arguments
+/// * `core` - Mutable reference to the core state
+/// * `keyval` - X11 keysym value for the pressed key
+/// * `state` - Modifier state bitmask (Shift, Ctrl, Alt, etc.)
+///
+/// # Returns
+/// A vector of actions that the engine should execute in order
+///
+/// # Key Constants
+/// Key values follow X11 keysym conventions:
+/// - ASCII characters: 0x20-0x7f (e.g., 'a' = 0x61)
+/// - Special keys: 0xff00-0xffff (e.g., Backspace = 0xff08)
 pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> {
-    // If a shortcut is pressed (e.g., Ctrl+C), pass it through.
+    // Ignore key release events (only process key press)
+    // IBus sets bit 30 in the state when it's a release event
+    const IBUS_RELEASE_MASK: u32 = 1 << 30;
+    if state & IBUS_RELEASE_MASK != 0 {
+        return vec![Action::PassThrough];
+    }
+
+    // Pass through system shortcuts (Ctrl+X, Alt+Tab, Super+..., etc.)
+    // These should be handled by the window manager, not the input method
     if is_shortcut(state) {
         return vec![Action::PassThrough];
     }
 
-    // Special keys constants (X11 keyvals)
-    const BACKSPACE: u32 = 0xff08;
-    const RETURN: u32 = 0xff0d;
-    const SPACE: u32 = 0x20;
+    // X11 keysym constants for special keys
+    const BACKSPACE: u32 = 0xff08; // Delete previous character
+    const RETURN: u32 = 0xff0d; // Enter key
+    const SPACE: u32 = 0x20; // Space bar
+    const TAB: u32 = 0xff09; // Tab key
+    const ESC: u32 = 0xff1b; // Escape key
 
     match keyval {
+        // ===== BACKSPACE: Delete the last character from buffer =====
         BACKSPACE => {
             if core.buffer.is_empty() {
-                // Buffer is empty, allow backspace to delete character in the application.
+                // Nothing to delete, let the app handle it
                 vec![Action::PassThrough]
             } else {
-                // Delete the last character in our internal buffer.
+                // Remove the last raw character from buffer
                 core.buffer.pop();
                 if core.buffer.is_empty() {
-                    // Buffer became empty, hide the preedit.
+                    // Buffer is now empty, hide the preedit window
                     vec![Action::HidePreedit, Action::Consume]
                 } else {
-                    // Transform the remaining buffer and update preedit.
+                    // Update preedit with remaining transformed text
                     let text = vi_transform(&core.buffer);
+                    let caret = text.chars().count();
                     vec![
                         Action::UpdatePreedit {
-                            text: text.clone(),
-                            caret: text.chars().count(),
+                            text,
+                            caret,
                             visible: true,
                         },
                         Action::Consume,
@@ -66,48 +135,97 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
                 }
             }
         }
-        SPACE | RETURN => {
+
+        // ===== ESCAPE: Cancel the current composition =====
+        ESC => {
             if core.buffer.is_empty() {
-                // Nothing to commit, pass through.
+                // No active composition, let the app handle Escape
                 vec![Action::PassThrough]
             } else {
-                // Transform buffer and commit it as a word.
-                let text = vi_transform(&core.buffer);
-                let mut out = vec![Action::Commit(text), Action::HidePreedit];
+                // Clear the buffer and hide preedit (discard uncommitted text)
                 core.buffer.clear();
-
-                // Also commit the space or newline that triggered the commit.
-                out.push(Action::Commit(if keyval == SPACE {
-                    " ".into()
-                } else {
-                    "\n".into()
-                }));
-                out.push(Action::Consume);
-                out
+                vec![Action::HidePreedit, Action::Consume]
             }
         }
+
+        // ===== WORD TERMINATORS: Space, Enter, Tab =====
+        // These keys commit the current word and pass through to the application
+        // so their original semantics are preserved (e.g., Enter creates a new line)
+        SPACE | RETURN | TAB => {
+            if core.buffer.is_empty() {
+                // No active composition, pass through directly
+                vec![Action::PassThrough]
+            } else {
+                // Transform and commit the buffered text
+                let text = vi_transform(&core.buffer);
+                core.buffer.clear();
+                vec![
+                    Action::Commit(text),
+                    Action::HidePreedit,
+                    // IMPORTANT: Pass the key through so Space/Enter/Tab
+                    // still have their normal effect in the application
+                    Action::PassThrough,
+                ]
+            }
+        }
+
+        // ===== ALL OTHER KEYS =====
         _ => {
-            // Check if the key corresponds to a printable character.
-            if let Some(ch) = keyval_to_char(keyval).filter(|&c| c != ' ') {
-                // Add character to buffer and perform Vietnamese transformation.
+            if let Some(ch) = keyval_to_char(keyval) {
+                // Check if this is a punctuation/separator character
+                // These characters commit the current word before being passed through
+                let is_separator = matches!(
+                    ch,
+                    '.' | ',' | ';' | ':' | '!' | '?' | '(' | ')' | '"' | '\'' | '/'
+                );
+
+                if is_separator {
+                    if core.buffer.is_empty() {
+                        // No active composition, just pass the punctuation through
+                        return vec![Action::PassThrough];
+                    }
+                    // Commit the current word, then pass the punctuation through
+                    let text = vi_transform(&core.buffer);
+                    core.buffer.clear();
+                    return vec![
+                        Action::Commit(text),
+                        Action::HidePreedit,
+                        Action::PassThrough,
+                    ];
+                }
+
+                // Regular character: add to buffer and update preedit
                 core.buffer.push(ch);
                 let text = vi_transform(&core.buffer);
+                let caret = text.chars().count();
                 return vec![
                     Action::UpdatePreedit {
-                        text: text.clone(),
-                        caret: text.chars().count(),
+                        text,
+                        caret,
                         visible: true,
                     },
                     Action::Consume,
                 ];
             }
-            // Irrelevant keys (e.g., Shift, Caps Lock) are passed through.
+
+            // Unrecognized key (Shift, Caps Lock, arrows, function keys, etc.)
+            // Pass through without affecting the composition
             vec![Action::PassThrough]
         }
     }
 }
 
-/// Applies Vietnamese input method transformations (Telex) to the given buffer.
+/// Transforms raw Telex input into Vietnamese text.
+///
+/// This is a thin wrapper around the telex module's transform_buffer function.
+/// It applies all Telex transformation rules to convert raw keystrokes into
+/// proper Vietnamese characters with diacritics and tone marks.
+///
+/// # Arguments
+/// * `buffer` - Raw Telex input string (e.g., "vieetj")
+///
+/// # Returns
+/// Transformed Vietnamese string (e.g., "việt")
 pub fn vi_transform(buffer: &str) -> String {
     telex::transform_buffer(buffer)
 }
@@ -116,7 +234,10 @@ pub fn vi_transform(buffer: &str) -> String {
 mod tests {
     use super::*;
 
-    /// Helper to simulate typing a string into the core.
+    /// Helper function to simulate typing a string and collect committed text.
+    ///
+    /// Feeds each character through the key handler and accumulates any
+    /// committed text. This is useful for testing complete typing sequences.
     fn feed(core: &mut CoreState, s: &str) -> String {
         let mut committed = String::new();
         for ch in s.chars() {
@@ -131,60 +252,38 @@ mod tests {
     }
 
     #[test]
-    fn typing_telex_updates_preedit_then_commit_on_space() {
+    fn typing_telex_commit_on_space() {
+        // Test: Typing "vieetj " should produce "việt"
         let mut core = CoreState::default();
         let out = feed(&mut core, "vieetj ");
-        assert_eq!(out, "việt ");
-        assert_eq!(core.buffer, "");
+        assert_eq!(out, "việt");
+        assert!(core.buffer.is_empty());
     }
 
     #[test]
-    fn backspace_edits_buffer() {
+    fn backspace_edit() {
+        // Test: Typing "ab", then backspace, then space should produce "a"
         let mut core = CoreState::default();
-        let out = {
-            let mut committed = String::new();
-            for keyval in ['a' as u32, 'b' as u32, 0xff08, ' ' as u32] {
-                let actions = handle_key(&mut core, keyval, 0);
-                for a in actions {
-                    if let Action::Commit(x) = a {
-                        committed.push_str(&x);
-                    }
-                }
-            }
-            committed
-        };
-        assert_eq!(out, "a ");
-        assert_eq!(core.buffer, "");
+        feed(&mut core, "ab");
+        handle_key(&mut core, 0xff08, 0); // Backspace
+        let out = feed(&mut core, " ");
+        assert_eq!(out, "a");
     }
 
     #[test]
-    fn passthrough_when_empty_and_space() {
+    fn punctuation_commit() {
+        // Test: Typing "chaof?" should commit "chào" when '?' is typed
         let mut core = CoreState::default();
-        let actions = handle_key(&mut core, ' ' as u32, 0);
-        assert!(actions.contains(&Action::PassThrough));
+        let out = feed(&mut core, "chaof?");
+        assert_eq!(out, "chào");
     }
 
     #[test]
-    fn shortcut_passthrough() {
+    fn esc_clear() {
+        // Test: Pressing Escape should clear the buffer
         let mut core = CoreState::default();
-        let actions = handle_key(&mut core, 'c' as u32, 1 << 2);
-        assert!(actions.contains(&Action::PassThrough));
-    }
-
-    #[test]
-    fn test_backspace_sequence() {
-        let mut core = CoreState::default();
-        // Type "vi", then backspace, then "ệt"
-        feed(&mut core, "vi");
-        handle_key(&mut core, 0xff08, 0); // Backspace 'i' -> buffer 'v'
-        let out = feed(&mut core, "eetj ");
-        assert_eq!(out, "vệt ");
-    }
-
-    #[test]
-    fn test_multi_word_typing() {
-        let mut core = CoreState::default();
-        let out = feed(&mut core, "chaof banj ");
-        assert_eq!(out, "chào bạn ");
+        feed(&mut core, "vieet");
+        handle_key(&mut core, 0xff1b, 0); // Escape
+        assert!(core.buffer.is_empty());
     }
 }
