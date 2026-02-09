@@ -1,0 +1,27 @@
+[package]
+name = "xkey"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+zbus = { version = "4", features = ["tokio"] }
+zvariant = "4"
+anyhow = "1"
+
+[package.metadata.deb]
+name = "xkey"
+maintainer = "Manh Pham <h3x4r@yahoo.com>"
+copyright = "2026, Manh Pham <h3x4r@yahoo.com>"
+license-file = ["LICENSE", "0"]
+depends = "ibus, libc6 (>= 2.31), libdbus-1-3 (>= 1.12.18)"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/xkey", "usr/libexec/ibus-engine-xkey", "755"],
+    ["xkey.xml", "usr/share/ibus/component/xkey.xml", "644"],
+]
+extended-description = """
+XKey is a lightweight Vietnamese Telex input method for Linux (IBus engine).
+It supports standard Telex rules and smart tone placement.
+"""

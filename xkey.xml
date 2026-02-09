@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component>
+  <name>com.manhpham.xkey</name>
+  <description>XKey</description>
+  <exec>/usr/libexec/ibus-engine-xkey</exec>
+  <version>0.1</version>
+  <author>Manh Pham</author>
+
+  <engines>
+    <engine>
+      <name>xkey</name>
+      <longname>XKey</longname>
+      <description>XKey</description>
+      <language>vi</language>
+      <layout>us</layout>
+    </engine>
+  </engines>
+</component>
