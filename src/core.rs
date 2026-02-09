@@ -88,20 +88,18 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
         }
         _ => {
             // Check if the key corresponds to a printable character.
-            if let Some(ch) = keyval_to_char(keyval) {
-                if ch != ' ' {
-                    // Add character to buffer and perform Vietnamese transformation.
-                    core.buffer.push(ch);
-                    let text = vi_transform(&core.buffer);
-                    return vec![
-                        Action::UpdatePreedit {
-                            text: text.clone(),
-                            caret: text.chars().count(),
-                            visible: true,
-                        },
-                        Action::Consume,
-                    ];
-                }
+            if let Some(ch) = keyval_to_char(keyval).filter(|&c| c != ' ') {
+                // Add character to buffer and perform Vietnamese transformation.
+                core.buffer.push(ch);
+                let text = vi_transform(&core.buffer);
+                return vec![
+                    Action::UpdatePreedit {
+                        text: text.clone(),
+                        caret: text.chars().count(),
+                        visible: true,
+                    },
+                    Action::Consume,
+                ];
             }
             // Irrelevant keys (e.g., Shift, Caps Lock) are passed through.
             vec![Action::PassThrough]

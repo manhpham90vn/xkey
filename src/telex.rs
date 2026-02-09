@@ -175,8 +175,7 @@ fn apply_tone(word: &str, tone_char: char) -> String {
     // Prefer marking a vowel that already has a diacritic (â, ă, ê, ô, ơ, ư)
     let marked_vowel_idx = vowel_indices
         .iter()
-        .filter(|&&idx| marked_vowels.contains(chars[idx].to_ascii_lowercase()))
-        .last();
+        .rfind(|&&idx| marked_vowels.contains(chars[idx].to_ascii_lowercase()));
 
     let target_idx = if let Some(&idx) = marked_vowel_idx {
         idx
