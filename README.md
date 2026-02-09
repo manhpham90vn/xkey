@@ -4,7 +4,10 @@
 [![Release](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml/badge.svg)](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A lightweight, high-performance Vietnamese Telex input method for Linux, running as an IBus engine. Written in Rust.
+A lightweight, high-performance Vietnamese Telex input method for **Ubuntu**, running as an IBus engine. Written in Rust.
+
+> [!IMPORTANT]
+> **This project only supports Ubuntu.** Other Linux distributions are not officially supported and may not work correctly.
 
 ## Features
 
@@ -19,9 +22,13 @@ A lightweight, high-performance Vietnamese Telex input method for Linux, running
 
 ### Prerequisites
 
+> [!CAUTION]
+> **Ubuntu only.** This project has been tested and developed exclusively for Ubuntu. It will not work on other Linux distributions.
+
+- **Ubuntu** (required)
 - [Rust](https://www.rust-lang.org/tools/install) (only for building from source)
 - IBus daemon
-- Build dependencies (Ubuntu/Debian):
+- Build dependencies:
   ```bash
   sudo apt install libdbus-1-dev pkg-config ibus
   ```
