@@ -27,7 +27,7 @@
 
 #### Option 1: Install via .deb (Recommended for Ubuntu/Debian)
 
-1. Download the latest `.deb` package from the [Releases](https://github.com/manh/xkey/releases) page.
+1. Download the latest `.deb` package from the [Releases](https://github.com/manhpham90vn/xkey/releases) page.
 2. Install the package:
    ```bash
    sudo apt install ./xkey_*.deb
@@ -42,7 +42,7 @@
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/manh/xkey.git
+   git clone https://github.com/manhpham90vn/xkey.git
    cd xkey
    ```
 
