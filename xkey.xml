@@ -1,18 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <component>
-  <name>com.manhpham.xkey</name>
-  <description>XKey</description>
-  <exec>/usr/libexec/ibus-engine-xkey</exec>
-  <version>0.1</version>
+  <name>org.freedesktop.IBus.Engine.xkey</name>
+  <description>XKey - Vietnamese Telex Input Method</description>
+  <exec>/usr/libexec/ibus-engine-xkey --ibus</exec>
+  <version>0.1.0</version>
   <author>Manh Pham</author>
+  <license>MIT</license>
+  <homepage>https://github.com/manhpham90vn/xkey</homepage>
+  <textdomain>xkey</textdomain>
 
   <engines>
     <engine>
       <name>xkey</name>
-      <longname>XKey</longname>
-      <description>XKey</description>
+      <longname>XKey Vietnamese Telex</longname>
+      <description>Vietnamese Telex Input Method</description>
       <language>vi</language>
+      <license>MIT</license>
+      <author>Manh Pham</author>
+      <icon>ibus-keyboard</icon>
       <layout>us</layout>
+      <rank>99</rank>
+      <symbol>vi</symbol>
+      <setup>/usr/libexec/ibus-engine-xkey --setup</setup>
     </engine>
   </engines>
 </component>

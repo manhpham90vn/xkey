@@ -1,106 +1,154 @@
-# xkey ⌨️
+# xkey
 
-**xkey** is a lightweight, high-performance Vietnamese Telex input method for Linux, running as an IBus engine. It is written in Rust for safety and efficiency.
+[![CI](https://github.com/manhpham90vn/xkey/actions/workflows/rust.yml/badge.svg)](https://github.com/manhpham90vn/xkey/actions/workflows/rust.yml)
+[![Release](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml/badge.svg)](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## ✨ Features
+A lightweight, high-performance Vietnamese Telex input method for Linux, running as an IBus engine. Written in Rust.
 
-- **Standard Telex**: Supports full Vietnamese Telex rules including vowel marks and tones.
-- **Smart Tone Placement**: Automatically places tone marks on the correct vowels according to Vietnamese grammar.
-- **IBus Integration**: Works seamlessly as a standard IBus input engine.
-- **REPL Mode**: Includes a built-in terminal-based REPL for testing transformations without installing the full engine.
-- **Lightweight**: Minimal resource usage and fast response times.
-- **Safety**: Built with Rust to ensure memory safety and prevent common bugs.
+## Features
 
-## 🚀 Getting Started
+- **Standard Telex** - Full Vietnamese Telex rules support
+- **Smart Tone Placement** - Automatically places tone marks correctly
+- **IBus Integration** - Works as a standard IBus engine
+- **REPL Mode** - Test transformations directly in terminal
+- **Lightweight** - Minimal resources, fast response
+- **Memory Safe** - Built with Rust
+
+## Installation
 
 ### Prerequisites
 
-- **Rust**: [Install Rust](https://www.rust-lang.org/tools/install)
-- **IBus**: Ensure `ibus` is installed on your system.
-- **Build Dependencies**:
+- [Rust](https://www.rust-lang.org/tools/install) (only for building from source)
+- IBus daemon
+- Build dependencies (Ubuntu/Debian):
   ```bash
-  sudo apt-get update
-  sudo apt-get install -y libdbus-1-dev pkg-config
+  sudo apt install libdbus-1-dev pkg-config ibus
   ```
 
-### Installation
+### Option 1: Download .deb Package (Recommended)
 
-#### Option 1: Install via .deb (Recommended for Ubuntu/Debian)
-
-1. Download the latest `.deb` package from the [Releases](https://github.com/manhpham90vn/xkey/releases) page.
-2. Install the package:
+1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
+2. Download the latest `.deb` file
+3. Install:
    ```bash
    sudo apt install ./xkey_*.deb
-   ```
-3. Restart IBus:
-   ```bash
    ibus restart
    ```
+4. Add xkey via **Settings > Keyboard > Input Sources > Add > Vietnamese > xkey**
 
-#### Option 2: Build from Source
+### Option 2: Build from Source
 
-1. Clone the repository:
+```bash
+git clone https://github.com/manhpham90vn/xkey.git
+cd xkey
+./install.sh
+```
 
-   ```bash
-   git clone https://github.com/manhpham90vn/xkey.git
-   cd xkey
-   ```
+The install script will:
 
-2. Run the installation script:
+- Build in release mode (`cargo build --release`)
+- Install binary to `/usr/libexec/ibus-engine-xkey`
+- Install component XML to `/usr/share/ibus/component/xkey.xml`
+- Restart IBus daemon
+- Add xkey to GNOME input sources
+- Activate xkey as default input method
 
-   ```bash
-   ./install.sh
-   ```
+### Uninstall
 
-   This script will build the project in release mode and register the xkey engine with IBus.
+```bash
+./clean.sh
+```
 
-3. Restart IBus:
+This removes binary, component XML, and xkey from GNOME input sources.
 
-   ```bash
-   ibus restart
-   ```
+## Usage
 
-4. Add **xkey** to your IBus input methods via **IBus Preferences**.
+### As IBus Engine
 
-### Usage in REPL Mode
+Once installed, switch input methods using:
 
-You can test the Vietnamese transformation directly in your terminal:
+- **Super + Space** (GNOME default)
+- IBus tray icon
+- GNOME top bar input indicator
+
+### Telex Typing
+
+| Input        | Output | Description    |
+| ------------ | ------ | -------------- |
+| `vieetj`     | việt   | ê + tone       |
+| `chaof`      | chào   | tone mark      |
+| `ươ` → `uow` | ươ     | vowel shortcut |
+| `dd`         | đ      | đ shortcut     |
+
+Press **Space**, **Enter**, or punctuation to commit.
+
+### REPL Mode
+
+Test Telex transformations directly:
 
 ```bash
 cargo run -- --repl
 ```
 
-In REPL mode, press **Space** or **Enter** to commit a word.
+### Troubleshooting
 
-## 🏗️ Architecture
-
-The project is structured into three main layers:
-
-1.  **IBus Engine (`engine.rs`)**: Handles D-Bus communication with IBus, receiving key events and sending signals (UpdatePreedit, Commit).
-2.  **Core Logic (`core.rs`)**: Manages the input buffer and decides when to transform or commit text.
-3.  **Telex Processor (`telex.rs`)**: Implements the actual Vietnamese Telex transformation rules.
-
-## 🛠️ Development
-
-### Running Tests
-
-We have a comprehensive unit test suite covering complex Vietnamese words and edge cases:
+**xkey not appearing in input list:**
 
 ```bash
-cargo test
+ibus list-engine | grep xkey
 ```
 
-### CI/CD
+**Check IBus daemon:**
 
-This project uses GitHub Actions for:
+```bash
+ibus restart
+# or
+systemctl --user restart org.freedesktop.IBus.session.GNOME.service
+```
 
-- **CI**: Automated building and testing on every push.
-- **Release**: Automatically building and publishing binary releases when a tag (e.g., `v0.1.0`) is pushed.
+**View logs:**
 
-## 📄 License
+```bash
+journalctl --user -b | grep -i ibus | tail -50
+```
 
-[MIT](LICENSE) (or your preferred license)
+## Architecture
 
----
+```
+src/
+├── main.rs     # Entry point, CLI
+├── engine.rs   # IBus engine, D-Bus communication
+├── core.rs     # Buffer management, input logic
+├── telex.rs    # Telex transformation rules
+├── repl.rs     # REPL mode
+└── utils.rs    # Utilities
+```
 
-_Made with ❤️ for the Linux Vietnamese community._
+| Module      | Description                                                          |
+| ----------- | -------------------------------------------------------------------- |
+| `engine.rs` | D-Bus communication with IBus, receives key events and sends signals |
+| `core.rs`   | Manages input buffer, decides when to transform/commit text          |
+| `telex.rs`  | Implements Vietnamese Telex transformation rules                     |
+
+## Development
+
+```bash
+# Run tests
+cargo test
+
+# Format code
+cargo fmt
+
+# Lint
+cargo clippy
+```
+
+## CI/CD
+
+- **CI**: Automated build and test on every push
+- **Release**: Build and publish binaries when pushing tags (`v*`)
+
+## License
+
+[MIT](LICENSE)

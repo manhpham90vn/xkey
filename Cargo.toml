@@ -22,8 +22,8 @@ depends = "ibus, libc6 (>= 2.31), libdbus-1-3 (>= 1.12.18)"
 section = "utils"
 priority = "optional"
 assets = [
-    ["target/release/xkey", "usr/libexec/ibus-engine-xkey", "755"],
-    ["xkey.xml", "usr/share/ibus/component/xkey.xml", "644"],
+    ["target/release/xkey", "/usr/libexec/ibus-engine-xkey", "755"],
+    ["xkey.xml", "/usr/share/ibus/component/xkey.xml", "644"],
 ]
 extended-description = """
 XKey is a lightweight Vietnamese Telex input method for Linux (IBus engine).
