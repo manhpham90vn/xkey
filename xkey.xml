@@ -3,7 +3,7 @@
   <name>org.freedesktop.IBus.Engine.xkey</name>
   <description>XKey - Vietnamese Telex Input Method</description>
   <exec>/usr/libexec/ibus-engine-xkey --ibus</exec>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <author>Manh Pham</author>
   <license>MIT</license>
   <homepage>https://github.com/manhpham90vn/xkey</homepage>
@@ -21,7 +21,6 @@
       <layout>us</layout>
       <rank>99</rank>
       <symbol>vi</symbol>
-      <setup>/usr/libexec/ibus-engine-xkey --setup</setup>
     </engine>
   </engines>
 </component>
