@@ -42,7 +42,7 @@ A lightweight, high-performance Vietnamese Telex input method for **Ubuntu**, ru
    sudo apt install ./xkey_*.deb
    ibus restart
    ```
-4. Add xkey via **Settings > Keyboard > Input Sources > Add > Vietnamese > xkey**
+4. Add xkey via **Settings > Keyboard > Input Sources > Add Input Source... > ⋮ > Other > Vietnamese (XKey Vietnamese Telex) > Add**
 
 ### Option 2: Build from Source
 
