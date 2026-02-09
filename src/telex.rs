@@ -250,11 +250,15 @@ fn process_word(word: &str) -> String {
 
     // If the original input was ALL UPPERCASE, make the result all uppercase
     // This handles cases like "CHAOF" → "CHÀO"
-    if word.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) {
+    let result = if word.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) {
         result.to_uppercase()
     } else {
         result
-    }
+    };
+
+    // Auto-correct tone position: if the tone was placed on the wrong vowel
+    // (e.g., "chưong" → "chương"), relocate it to the correct position
+    relocate_tone(&result)
 }
 
 /// Determines which vowel should receive the tone mark based on Vietnamese grammar rules.
@@ -281,7 +285,41 @@ fn apply_tone(word: &str, tone_char: char) -> String {
 
     let chars: Vec<char> = word.chars().collect();
 
-    // Find all vowel positions in the word
+    // Check if word ends with consonant (closed syllable)
+    let last_char = chars.last().cloned().unwrap_or(' ').to_ascii_lowercase();
+    let ends_with_consonant = !vowels.contains(last_char);
+
+    // Special handling for ưo cluster in closed syllables
+    // In Vietnamese, "ưo" should often become "ươ" when a tone is applied
+    // For words like "chương", "hương", the tone goes on ơ, not ư
+    let word_lower: String = chars
+        .iter()
+        .map(|c| c.to_lowercase().next().unwrap_or(*c))
+        .collect();
+
+    // Check for ưo pattern (user typed uw + o but not ow for ơ)
+    let has_uo_pattern = word_lower.contains("ưo") && !word_lower.contains("ươ");
+
+    // If we have ưo pattern in closed syllable, convert o to ơ
+    let mut chars = chars; // Make mutable
+    if has_uo_pattern && ends_with_consonant {
+        // Find the position of 'o' after 'ư' and convert it to 'ơ'
+        for i in 0..chars.len().saturating_sub(1) {
+            let curr = chars[i].to_lowercase().next().unwrap_or(' ');
+            let next = chars[i + 1].to_lowercase().next().unwrap_or(' ');
+            if curr == 'ư' && next == 'o' {
+                // Preserve case when converting o to ơ
+                chars[i + 1] = if chars[i + 1].is_uppercase() {
+                    'Ơ'
+                } else {
+                    'ơ'
+                };
+                break;
+            }
+        }
+    }
+
+    // Calculate vowel indices from the (potentially modified) chars
     let mut vowel_indices = Vec::new();
     for (i, &c) in chars.iter().enumerate() {
         if vowels.contains(c.to_ascii_lowercase()) {
@@ -291,14 +329,14 @@ fn apply_tone(word: &str, tone_char: char) -> String {
 
     // If no vowels found, just append the tone character literally (edge case)
     if vowel_indices.is_empty() {
-        let mut s = word.to_string();
+        let mut s: String = chars.into_iter().collect();
         s.push(tone_char);
         return s;
     }
 
     // Handle "qu" and "gi" clusters where the second letter is a semi-consonant
     // In these cases, skip the first vowel (u in qu, i in gi)
-    if vowel_indices.len() > 1 {
+    if vowel_indices.len() > 1 && chars.len() >= 2 {
         let first_char = chars[0].to_ascii_lowercase();
         let second_char = chars[1].to_ascii_lowercase();
         if (first_char == 'q' && second_char == 'u') || (first_char == 'g' && second_char == 'i') {
@@ -306,29 +344,55 @@ fn apply_tone(word: &str, tone_char: char) -> String {
         }
     }
 
-    // Strategy 1: Prefer placing tone on a vowel that already has a diacritic
-    // This follows Vietnamese orthographic conventions
-    let marked_vowel_idx = vowel_indices
-        .iter()
-        .rfind(|&&idx| marked_vowels.contains(chars[idx].to_ascii_lowercase()));
+    // Now find the target vowel for tone placement
+    let has_uo_cluster = {
+        let word_lower: String = chars
+            .iter()
+            .map(|c| c.to_lowercase().next().unwrap_or(*c))
+            .collect();
+        word_lower.contains("ươ")
+    };
 
-    let target_idx = if let Some(&idx) = marked_vowel_idx {
-        // Found a marked vowel, use it
-        idx
-    } else {
-        // No marked vowel, apply syllable-based rules
-        let last_char = chars.last().cloned().unwrap_or(' ').to_ascii_lowercase();
-        let ends_with_consonant = !vowels.contains(last_char);
+    let target_idx = if has_uo_cluster && ends_with_consonant && vowel_indices.len() >= 2 {
+        // For ươ cluster in closed syllable: tone on the second vowel (ơ)
+        // Find which vowel is ơ or o with diacritic potential
+        let uo_pair: Vec<usize> = vowel_indices
+            .iter()
+            .cloned()
+            .filter(|&idx| {
+                let ch = chars[idx].to_lowercase().next().unwrap_or(' ');
+                ch == 'ư' || ch == 'ơ'
+            })
+            .collect();
 
-        if ends_with_consonant {
-            // Closed syllable: tone on the last vowel
-            *vowel_indices.last().unwrap()
+        if uo_pair.len() >= 2 {
+            // Return the second one (ơ position)
+            uo_pair[1]
         } else {
-            // Open syllable: tone on the second-to-last vowel (if available)
-            if vowel_indices.len() >= 2 {
-                vowel_indices[vowel_indices.len() - 2]
+            // Fallback to last vowel for closed syllable
+            *vowel_indices.last().unwrap()
+        }
+    } else {
+        // Standard logic: prefer marked vowels first
+        let marked_vowel_idx = vowel_indices
+            .iter()
+            .rfind(|&&idx| marked_vowels.contains(chars[idx].to_ascii_lowercase()));
+
+        if let Some(&idx) = marked_vowel_idx {
+            // Found a marked vowel, use it
+            idx
+        } else {
+            // No marked vowel, apply syllable-based rules
+            if ends_with_consonant {
+                // Closed syllable: tone on the last vowel
+                *vowel_indices.last().unwrap()
             } else {
-                vowel_indices[0]
+                // Open syllable: tone on the second-to-last vowel (if available)
+                if vowel_indices.len() >= 2 {
+                    vowel_indices[vowel_indices.len() - 2]
+                } else {
+                    vowel_indices[0]
+                }
             }
         }
     };
@@ -454,6 +518,152 @@ fn add_mark(ch: char, tone: char) -> char {
     }
 }
 
+/// Extracts the tone mark from a Vietnamese vowel character.
+///
+/// Given a vowel with a tone mark, this function returns the base vowel
+/// (with diacritic preserved but tone removed) and the tone mark character.
+///
+/// # Arguments
+/// * `ch` - A Vietnamese character (may have tone mark)
+///
+/// # Returns
+/// A tuple of (base_char, Option<tone_char>) where:
+/// - `base_char` is the vowel without tone (but keeps diacritic like ư, ơ, â)
+/// - `tone_char` is 's', 'f', 'r', 'x', 'j' or None if no tone
+///
+/// # Examples
+/// - 'ừ' → ('ư', Some('f'))
+/// - 'ự' → ('ư', Some('j'))
+/// - 'ư' → ('ư', None)
+/// - 'a' → ('a', None)
+fn extract_tone(ch: char) -> (char, Option<char>) {
+    let is_upper = ch.is_uppercase();
+    let ch_lower = ch.to_lowercase().next().unwrap_or(ch);
+
+    let (base, tone) = match ch_lower {
+        // a with tones
+        'á' => ('a', Some('s')),
+        'à' => ('a', Some('f')),
+        'ả' => ('a', Some('r')),
+        'ã' => ('a', Some('x')),
+        'ạ' => ('a', Some('j')),
+        // â with tones
+        'ấ' => ('â', Some('s')),
+        'ầ' => ('â', Some('f')),
+        'ẩ' => ('â', Some('r')),
+        'ẫ' => ('â', Some('x')),
+        'ậ' => ('â', Some('j')),
+        // ă with tones
+        'ắ' => ('ă', Some('s')),
+        'ằ' => ('ă', Some('f')),
+        'ẳ' => ('ă', Some('r')),
+        'ẵ' => ('ă', Some('x')),
+        'ặ' => ('ă', Some('j')),
+        // e with tones
+        'é' => ('e', Some('s')),
+        'è' => ('e', Some('f')),
+        'ẻ' => ('e', Some('r')),
+        'ẽ' => ('e', Some('x')),
+        'ẹ' => ('e', Some('j')),
+        // ê with tones
+        'ế' => ('ê', Some('s')),
+        'ề' => ('ê', Some('f')),
+        'ể' => ('ê', Some('r')),
+        'ễ' => ('ê', Some('x')),
+        'ệ' => ('ê', Some('j')),
+        // o with tones
+        'ó' => ('o', Some('s')),
+        'ò' => ('o', Some('f')),
+        'ỏ' => ('o', Some('r')),
+        'õ' => ('o', Some('x')),
+        'ọ' => ('o', Some('j')),
+        // ô with tones
+        'ố' => ('ô', Some('s')),
+        'ồ' => ('ô', Some('f')),
+        'ổ' => ('ô', Some('r')),
+        'ỗ' => ('ô', Some('x')),
+        'ộ' => ('ô', Some('j')),
+        // ơ with tones
+        'ớ' => ('ơ', Some('s')),
+        'ờ' => ('ơ', Some('f')),
+        'ở' => ('ơ', Some('r')),
+        'ỡ' => ('ơ', Some('x')),
+        'ợ' => ('ơ', Some('j')),
+        // u with tones
+        'ú' => ('u', Some('s')),
+        'ù' => ('u', Some('f')),
+        'ủ' => ('u', Some('r')),
+        'ũ' => ('u', Some('x')),
+        'ụ' => ('u', Some('j')),
+        // ư with tones
+        'ứ' => ('ư', Some('s')),
+        'ừ' => ('ư', Some('f')),
+        'ử' => ('ư', Some('r')),
+        'ữ' => ('ư', Some('x')),
+        'ự' => ('ư', Some('j')),
+        // i with tones
+        'í' => ('i', Some('s')),
+        'ì' => ('i', Some('f')),
+        'ỉ' => ('i', Some('r')),
+        'ĩ' => ('i', Some('x')),
+        'ị' => ('i', Some('j')),
+        // y with tones
+        'ý' => ('y', Some('s')),
+        'ỳ' => ('y', Some('f')),
+        'ỷ' => ('y', Some('r')),
+        'ỹ' => ('y', Some('x')),
+        'ỵ' => ('y', Some('j')),
+        // No tone
+        _ => (ch_lower, None),
+    };
+
+    // Restore original case
+    let base_with_case = if is_upper {
+        base.to_uppercase().next().unwrap_or(base)
+    } else {
+        base
+    };
+
+    (base_with_case, tone)
+}
+
+/// Relocates the tone mark to the correct vowel position in a Vietnamese word.
+///
+/// This function handles cases where the user typed the tone mark before
+/// completing the word, causing it to land on the wrong vowel. For example:
+/// - "chưong" typo: tone on ư, should be on ơ → "chương"
+/// - "đựoc" typo: tone on ự, should be on ọ → "được"
+///
+/// The function extracts any existing tone marks, removes them, and then
+/// reapplies the tone to the correct vowel using Vietnamese grammar rules.
+///
+/// # Arguments
+/// * `word` - A Vietnamese word that may have incorrectly placed tone marks
+///
+/// # Returns
+/// The word with tone mark relocated to the correct position
+fn relocate_tone(word: &str) -> String {
+    // First pass: find any tone mark in the word
+    let mut found_tone: Option<char> = None;
+    let mut chars_without_tone = String::new();
+
+    for ch in word.chars() {
+        let (base, tone) = extract_tone(ch);
+        if tone.is_some() && found_tone.is_none() {
+            found_tone = tone;
+        }
+        chars_without_tone.push(base);
+    }
+
+    // If no tone found, return original word
+    let Some(tone) = found_tone else {
+        return word.to_string();
+    };
+
+    // Apply tone to correct position using existing apply_tone logic
+    apply_tone(&chars_without_tone, tone)
+}
+
 // ============================================================================
 // UNIT TESTS
 // ============================================================================
@@ -550,5 +760,22 @@ mod tests {
         assert_eq!(transform_buffer("viet1"), "viet1");
         assert_eq!(transform_buffer("viet!"), "viet!");
         assert_eq!(transform_buffer("chaof?"), "chào?");
+    }
+
+    /// Test auto-correction of tone placement for ươ cluster in closed syllables
+    /// When user types tone before completing ươ cluster, it should auto-correct
+    #[test]
+    fn test_auto_correct_tone_position() {
+        // Case: User types chuw (chư) + f (tone) + ong → should become chường (not chừong)
+        // The o should auto-convert to ơ and tone should apply to ơ
+        assert_eq!(transform_buffer("chuwfong"), "chường"); // huyền tone
+        assert_eq!(transform_buffer("chuwsong"), "chướng"); // sắc tone
+
+        // Case: User types dduw (đư) + j (nặng) + oc → should become được (not đựoc)
+        assert_eq!(transform_buffer("dduwjoc"), "được");
+
+        // Already correct sequences should stay the same
+        assert_eq!(transform_buffer("chuowfng"), "chường"); // formal way to type
+        assert_eq!(transform_buffer("dduwowcj"), "được"); // formal way to type
     }
 }
