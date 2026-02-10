@@ -63,7 +63,7 @@ pub fn transform_buffer(buffer: &str) -> String {
 
     // Iterate through characters to separate words by whitespace or punctuation
     for ch in buffer.chars() {
-        if ch.is_whitespace() || ch.is_ascii_punctuation() {
+        if ch.is_whitespace() || (ch.is_ascii_punctuation() && ch != '[' && ch != ']') {
             // Process the accumulated word before adding the separator
             result.push_str(&process_word(&current_word));
             result.push(ch);
@@ -192,6 +192,18 @@ fn process_word(word: &str) -> String {
                 i += 1;
             }
 
+            // Bracket shortcuts: '[' → ư, ']' → ơ
+            ('[', _) => {
+                out_chars.push('ư');
+                out_upper.push(false);
+                i += 1;
+            }
+            (']', _) => {
+                out_chars.push('ơ');
+                out_upper.push(false);
+                i += 1;
+            }
+
             // Tone mark characters (only apply if we have a vowel to mark)
             ('s', _) | ('f', _) | ('r', _) | ('x', _) | ('j', _) => {
                 let vowels = "aeiouyâăêôơư";
@@ -200,15 +212,36 @@ fn process_word(word: &str) -> String {
                     .any(|c| vowels.contains(c.to_ascii_lowercase()));
 
                 if has_vowel {
-                    // Toggle behavior: typing the same tone twice removes it
+                    // Double-tap behavior: typing the same tone twice
+                    // outputs the literal character (e.g., "ass" → "as")
                     if tone == Some(current_lower) {
                         tone = None;
+                        out_chars.push(current);
+                        out_upper.push(current.is_uppercase());
                     } else {
                         tone = Some(current_lower);
                     }
                 } else {
                     // No vowel yet, treat as a regular consonant character
                     // (e.g., "s" at the start of a word)
+                    out_chars.push(current);
+                    out_upper.push(current.is_uppercase());
+                }
+                i += 1;
+            }
+
+            // 'z' key: remove any active tone mark
+            ('z', _) => {
+                let vowels = "aeiouyâăêôơư";
+                let has_vowel = out_chars
+                    .iter()
+                    .any(|c| vowels.contains(c.to_ascii_lowercase()));
+
+                if has_vowel && tone.is_some() {
+                    // Remove the tone mark
+                    tone = None;
+                } else {
+                    // No tone to remove or no vowel, treat as regular character
                     out_chars.push(current);
                     out_upper.push(current.is_uppercase());
                 }
@@ -250,7 +283,10 @@ fn process_word(word: &str) -> String {
 
     // If the original input was ALL UPPERCASE, make the result all uppercase
     // This handles cases like "CHAOF" → "CHÀO"
-    let result = if word.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) {
+    // Require at least one actual uppercase letter to avoid false positives
+    // with non-alphabetic-only input (e.g., "[" brackets)
+    let has_uppercase = word.chars().any(|c| c.is_uppercase());
+    let result = if has_uppercase && word.chars().all(|c| !c.is_alphabetic() || c.is_uppercase()) {
         result.to_uppercase()
     } else {
         result
@@ -720,12 +756,12 @@ mod tests {
         assert_eq!(transform_buffer("CHAOF"), "CHÀO"); // All caps
     }
 
-    /// Test tone toggling (typing same tone twice removes it)
+    /// Test double-tap tone keys: typing same tone twice outputs literal character
     #[test]
-    fn test_tone_toggling() {
-        assert_eq!(transform_buffer("ass"), "a"); // s + s cancels
+    fn test_double_tap_tone() {
+        assert_eq!(transform_buffer("ass"), "as"); // s + s = literal 's'
         assert_eq!(transform_buffer("asf"), "à"); // s then f = f wins
-        assert_eq!(transform_buffer("aass"), "â"); // aa = â, ss cancels
+        assert_eq!(transform_buffer("aass"), "âs"); // aa = â, ss = literal 's'
     }
 
     /// Test 'w' shortcut for ư and ơ
@@ -777,5 +813,23 @@ mod tests {
         // Already correct sequences should stay the same
         assert_eq!(transform_buffer("chuowfng"), "chường"); // formal way to type
         assert_eq!(transform_buffer("dduwowcj"), "được"); // formal way to type
+    }
+
+    /// Test 'z' key removes tone mark
+    #[test]
+    fn test_z_remove_tone() {
+        assert_eq!(transform_buffer("asz"), "a"); // s then z removes tone
+        assert_eq!(transform_buffer("aafz"), "â"); // â + f → ầ, z removes tone → â
+        assert_eq!(transform_buffer("az"), "az"); // no tone to remove, literal z
+        assert_eq!(transform_buffer("z"), "z"); // standalone z
+    }
+
+    /// Test bracket shortcuts for ư and ơ
+    #[test]
+    fn test_bracket_shortcuts() {
+        assert_eq!(transform_buffer("["), "ư"); // [ → ư
+        assert_eq!(transform_buffer("]"), "ơ"); // ] → ơ
+        assert_eq!(transform_buffer("t[s"), "tứ"); // with tone
+        assert_eq!(transform_buffer("h]s"), "hớ"); // with tone
     }
 }

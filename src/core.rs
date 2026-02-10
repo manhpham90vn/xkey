@@ -176,7 +176,7 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
                 // These characters commit the current word before being passed through
                 let is_separator = matches!(
                     ch,
-                    '.' | ',' | ';' | ':' | '!' | '?' | '(' | ')' | '"' | '\'' | '/'
+                    '.' | ',' | ';' | ':' | '!' | '?' | '(' | ')' | '"' | '\'' | '/' | '0'..='9'
                 );
 
                 if is_separator {
@@ -284,6 +284,15 @@ mod tests {
         let mut core = CoreState::default();
         feed(&mut core, "vieet");
         handle_key(&mut core, 0xff1b, 0); // Escape
+        assert!(core.buffer.is_empty());
+    }
+
+    #[test]
+    fn digit_separator() {
+        // Test: Typing "vieetj6" should commit "việt" when '6' is typed
+        let mut core = CoreState::default();
+        let out = feed(&mut core, "vieetj6");
+        assert_eq!(out, "việt");
         assert!(core.buffer.is_empty());
     }
 }
