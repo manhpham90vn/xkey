@@ -105,6 +105,9 @@ ensure_ibus_address || echo "Warning: Could not determine IBUS_ADDRESS (will sti
 
 # Step 2: Build the project in release mode
 echo "[1/6] Building xkey in release mode..."
+if ! command -v cargo >/dev/null 2>&1; then
+  die "Rust is not installed. Please install it from https://rustup.rs/ before running this script."
+fi
 cargo build --release
 
 # Step 3: Install the binary

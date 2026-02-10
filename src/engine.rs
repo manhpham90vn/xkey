@@ -87,7 +87,7 @@ impl XKey {
                         ibus_text(text),
                         caret as u32,
                         visible,
-                        0, // mode: 0 = IBUS_ENGINE_PREEDIT_CLEAR
+                        1, // mode: 1 = IBUS_ENGINE_PREEDIT_COMMIT (auto-commit on focus loss)
                     )
                     .await?;
                 }
@@ -144,7 +144,7 @@ impl XKey {
         // Lock the state, process the key, and release the lock immediately
         // This prevents holding the lock across await points
         let actions = {
-            let mut guard = self.st.lock().unwrap();
+            let mut guard = self.st.lock().unwrap_or_else(|e| e.into_inner());
             handle_key(&mut guard.core, keyval, state)
         };
 
@@ -174,12 +174,23 @@ impl XKey {
         &self,
         #[zbus(signal_context)] ctxt: SignalContext<'_>,
     ) -> zbus::fdo::Result<()> {
-        {
-            // Lock scope: clear buffer while holding the lock
-            let mut guard = self.st.lock().unwrap();
-            guard.core.buffer.clear();
-        } // Lock is released here, before the await
+        // Commit any pending preedit text before clearing the buffer
+        // This prevents losing the last word when focus changes
+        // (e.g., user clicks Send button in browser)
+        let pending_text = {
+            let mut guard = self.st.lock().unwrap_or_else(|e| e.into_inner());
+            if guard.core.buffer.is_empty() {
+                None
+            } else {
+                let text = crate::core::vi_transform(&guard.core.buffer);
+                guard.core.buffer.clear();
+                Some(text)
+            }
+        }; // Lock is released here, before the await
 
+        if let Some(text) = pending_text {
+            Self::commit_text(&ctxt, ibus_text(text)).await?;
+        }
         Self::hide_preedit_text(&ctxt).await?;
         Ok(())
     }
@@ -195,7 +206,7 @@ impl XKey {
     ) -> zbus::fdo::Result<()> {
         {
             // Lock scope: clear buffer while holding the lock
-            let mut guard = self.st.lock().unwrap();
+            let mut guard = self.st.lock().unwrap_or_else(|e| e.into_inner());
             guard.core.buffer.clear();
         } // Lock is released here, before the await
 
