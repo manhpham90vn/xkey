@@ -174,10 +174,10 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
             if let Some(ch) = keyval_to_char(keyval) {
                 // Check if this is a punctuation/separator character
                 // These characters commit the current word before being passed through
-                let is_separator = matches!(
-                    ch,
-                    '.' | ',' | ';' | ':' | '!' | '?' | '(' | ')' | '"' | '\'' | '/' | '0'..='9'
-                );
+                // Keep separator behavior aligned with telex::transform_buffer:
+                // all ASCII punctuation except [ ] plus digits.
+                let is_separator =
+                    ch.is_ascii_digit() || (ch.is_ascii_punctuation() && ch != '[' && ch != ']');
 
                 if is_separator {
                     if core.buffer.is_empty() {
@@ -293,6 +293,23 @@ mod tests {
         let mut core = CoreState::default();
         let out = feed(&mut core, "vieetj6");
         assert_eq!(out, "việt");
+        assert!(core.buffer.is_empty());
+    }
+
+    #[test]
+    fn hyphen_separator_commit() {
+        // Test: Typing '-' should commit current word and pass '-' through
+        let mut core = CoreState::default();
+        feed(&mut core, "chaof");
+        let actions = handle_key(&mut core, '-' as u32, 0);
+        assert_eq!(
+            actions,
+            vec![
+                Action::Commit("chào".to_string()),
+                Action::HidePreedit,
+                Action::PassThrough
+            ]
+        );
         assert!(core.buffer.is_empty());
     }
 }

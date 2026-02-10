@@ -77,6 +77,14 @@ pub fn transform_buffer(buffer: &str) -> String {
     result
 }
 
+/// Unicode-aware lowercase conversion for single chars.
+///
+/// `to_ascii_lowercase` is insufficient for Vietnamese uppercase letters
+/// like `Ư`, `Ơ`, `Â`, etc.
+fn lower_char(ch: char) -> char {
+    ch.to_lowercase().next().unwrap_or(ch)
+}
+
 /// Transforms a single word based on Telex rules.
 ///
 /// This function processes a single word (no whitespace or punctuation) and applies:
@@ -170,7 +178,7 @@ fn process_word(word: &str) -> String {
             ('w', _) => {
                 // 'w' can transform the previous vowel or become 'ư' on its own
                 if let Some(&last) = out_chars.last() {
-                    let last_lower = last.to_ascii_lowercase();
+                    let last_lower = lower_char(last);
                     if last_lower == 'u' {
                         // Replace 'u' with 'ư'
                         out_chars.pop();
@@ -207,9 +215,7 @@ fn process_word(word: &str) -> String {
             // Tone mark characters (only apply if we have a vowel to mark)
             ('s', _) | ('f', _) | ('r', _) | ('x', _) | ('j', _) => {
                 let vowels = "aeiouyâăêôơư";
-                let has_vowel = out_chars
-                    .iter()
-                    .any(|c| vowels.contains(c.to_ascii_lowercase()));
+                let has_vowel = out_chars.iter().any(|c| vowels.contains(lower_char(*c)));
 
                 if has_vowel {
                     // Double-tap behavior: typing the same tone twice
@@ -233,9 +239,7 @@ fn process_word(word: &str) -> String {
             // 'z' key: remove any active tone mark
             ('z', _) => {
                 let vowels = "aeiouyâăêôơư";
-                let has_vowel = out_chars
-                    .iter()
-                    .any(|c| vowels.contains(c.to_ascii_lowercase()));
+                let has_vowel = out_chars.iter().any(|c| vowels.contains(lower_char(*c)));
 
                 if has_vowel && tone.is_some() {
                     // Remove the tone mark
@@ -322,7 +326,7 @@ fn apply_tone(word: &str, tone_char: char) -> String {
     let chars: Vec<char> = word.chars().collect();
 
     // Check if word ends with consonant (closed syllable)
-    let last_char = chars.last().cloned().unwrap_or(' ').to_ascii_lowercase();
+    let last_char = lower_char(chars.last().cloned().unwrap_or(' '));
     let ends_with_consonant = !vowels.contains(last_char);
 
     // Special handling for ưo cluster in closed syllables
@@ -358,7 +362,7 @@ fn apply_tone(word: &str, tone_char: char) -> String {
     // Calculate vowel indices from the (potentially modified) chars
     let mut vowel_indices = Vec::new();
     for (i, &c) in chars.iter().enumerate() {
-        if vowels.contains(c.to_ascii_lowercase()) {
+        if vowels.contains(lower_char(c)) {
             vowel_indices.push(i);
         }
     }
@@ -373,8 +377,8 @@ fn apply_tone(word: &str, tone_char: char) -> String {
     // Handle "qu" and "gi" clusters where the second letter is a semi-consonant
     // In these cases, skip the first vowel (u in qu, i in gi)
     if vowel_indices.len() > 1 && chars.len() >= 2 {
-        let first_char = chars[0].to_ascii_lowercase();
-        let second_char = chars[1].to_ascii_lowercase();
+        let first_char = lower_char(chars[0]);
+        let second_char = lower_char(chars[1]);
         if (first_char == 'q' && second_char == 'u') || (first_char == 'g' && second_char == 'i') {
             vowel_indices.remove(0);
         }
@@ -412,7 +416,7 @@ fn apply_tone(word: &str, tone_char: char) -> String {
         // Standard logic: prefer marked vowels first
         let marked_vowel_idx = vowel_indices
             .iter()
-            .rfind(|&&idx| marked_vowels.contains(chars[idx].to_ascii_lowercase()));
+            .rfind(|&&idx| marked_vowels.contains(lower_char(chars[idx])));
 
         if let Some(&idx) = marked_vowel_idx {
             // Found a marked vowel, use it
@@ -466,7 +470,7 @@ fn apply_tone(word: &str, tone_char: char) -> String {
 /// The combined character with both diacritic and tone mark
 fn add_mark(ch: char, tone: char) -> char {
     let is_upper = ch.is_uppercase();
-    let ch_lower = ch.to_ascii_lowercase();
+    let ch_lower = lower_char(ch);
 
     // Map (vowel, tone) pairs to pre-composed Unicode characters
     let res = match (ch_lower, tone) {
@@ -754,6 +758,8 @@ mod tests {
         assert_eq!(transform_buffer("AA"), "Â"); // All uppercase
         assert_eq!(transform_buffer("vIeetj"), "vIệt"); // Mixed case
         assert_eq!(transform_buffer("CHAOF"), "CHÀO"); // All caps
+        assert_eq!(transform_buffer("CHUOWFNG"), "CHƯỜNG"); // All caps with ươ
+        assert_eq!(transform_buffer("DDUWOWCJ"), "ĐƯỢC"); // All caps with ươ + nặng
     }
 
     /// Test double-tap tone keys: typing same tone twice outputs literal character
