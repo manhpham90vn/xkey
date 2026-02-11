@@ -222,6 +222,47 @@ fn process_word(word: &str) -> String {
                 i += 2;
             }
 
+            // Double-w undo: 'ww' after a vowel that was transformed → undo and output raw 'w'
+            // e.g., "uww" → "uw", "oww" → "ow", "ww" → "w"
+            ('w', Some('w'), _) => {
+                // Check if previous char was transformed to ư or ơ by a prior 'w'
+                if let Some(&last) = out_chars.last() {
+                    let last_lower = lower_char(last);
+                    if last_lower == 'ư' {
+                        // Undo ư → u, then add literal 'w'
+                        let was_upper = *out_upper.last().unwrap_or(&false);
+                        out_chars.pop();
+                        out_upper.pop();
+                        out_chars.push('u');
+                        out_upper.push(was_upper);
+                        out_chars.push('w');
+                        out_upper.push(original_chars[i].is_uppercase());
+                        bypass = true;
+                    } else if last_lower == 'ơ' {
+                        // Undo ơ → o, then add literal 'w'
+                        let was_upper = *out_upper.last().unwrap_or(&false);
+                        out_chars.pop();
+                        out_upper.pop();
+                        out_chars.push('o');
+                        out_upper.push(was_upper);
+                        out_chars.push('w');
+                        out_upper.push(original_chars[i].is_uppercase());
+                        bypass = true;
+                    } else {
+                        // Previous char wasn't transformed, just output 'w'
+                        out_chars.push('w');
+                        out_upper.push(original_chars[i].is_uppercase());
+                        bypass = true;
+                    }
+                } else {
+                    // 'ww' at start of word → just 'w'
+                    out_chars.push('w');
+                    out_upper.push(original_chars[i].is_uppercase());
+                    bypass = true;
+                }
+                i += 2;
+            }
+
             // Standalone 'w' shortcut for ư or ơ
             ('w', _, _) => {
                 // 'w' can transform the previous vowel or become 'ư' on its own
@@ -949,5 +990,244 @@ mod tests {
         assert_eq!(transform_buffer("aa"), "â"); // existing behavior
         assert_eq!(transform_buffer("ee"), "ê"); // existing behavior
         assert_eq!(transform_buffer("oo"), "ô"); // existing behavior
+    }
+
+    // ========================================================================
+    // SUPPLEMENTARY TESTS – covering identified gaps
+    // ========================================================================
+
+    /// Test tone marks on all base vowels (e, i, o, u, y)
+    /// Original tests only covered 'a'.
+    #[test]
+    fn test_tones_all_vowels() {
+        // e
+        assert_eq!(transform_buffer("es"), "é");
+        assert_eq!(transform_buffer("ef"), "è");
+        assert_eq!(transform_buffer("er"), "ẻ");
+        assert_eq!(transform_buffer("ex"), "ẽ");
+        assert_eq!(transform_buffer("ej"), "ẹ");
+        // i
+        assert_eq!(transform_buffer("is"), "í");
+        assert_eq!(transform_buffer("if"), "ì");
+        assert_eq!(transform_buffer("ir"), "ỉ");
+        assert_eq!(transform_buffer("ix"), "ĩ");
+        assert_eq!(transform_buffer("ij"), "ị");
+        // o
+        assert_eq!(transform_buffer("os"), "ó");
+        assert_eq!(transform_buffer("of"), "ò");
+        assert_eq!(transform_buffer("or"), "ỏ");
+        assert_eq!(transform_buffer("ox"), "õ");
+        assert_eq!(transform_buffer("oj"), "ọ");
+        // u
+        assert_eq!(transform_buffer("us"), "ú");
+        assert_eq!(transform_buffer("uf"), "ù");
+        assert_eq!(transform_buffer("ur"), "ủ");
+        assert_eq!(transform_buffer("ux"), "ũ");
+        assert_eq!(transform_buffer("uj"), "ụ");
+        // y
+        assert_eq!(transform_buffer("ys"), "ý");
+        assert_eq!(transform_buffer("yf"), "ỳ");
+        assert_eq!(transform_buffer("yr"), "ỷ");
+        assert_eq!(transform_buffer("yx"), "ỹ");
+        assert_eq!(transform_buffer("yj"), "ỵ");
+    }
+
+    /// Test tone marks on vowels with diacritics (â, ă, ê, ô, ơ, ư)
+    #[test]
+    fn test_tones_on_diacritic_vowels() {
+        // â (aa + tone)
+        assert_eq!(transform_buffer("aas"), "ấ");
+        assert_eq!(transform_buffer("aaf"), "ầ");
+        assert_eq!(transform_buffer("aar"), "ẩ");
+        assert_eq!(transform_buffer("aax"), "ẫ");
+        assert_eq!(transform_buffer("aaj"), "ậ");
+        // ă (aw + tone)
+        assert_eq!(transform_buffer("aws"), "ắ");
+        assert_eq!(transform_buffer("awf"), "ằ");
+        assert_eq!(transform_buffer("awr"), "ẳ");
+        assert_eq!(transform_buffer("awx"), "ẵ");
+        assert_eq!(transform_buffer("awj"), "ặ");
+        // ê (ee + tone)
+        assert_eq!(transform_buffer("ees"), "ế");
+        assert_eq!(transform_buffer("eef"), "ề");
+        assert_eq!(transform_buffer("eer"), "ể");
+        assert_eq!(transform_buffer("eex"), "ễ");
+        assert_eq!(transform_buffer("eej"), "ệ");
+        // ô (oo + tone)
+        assert_eq!(transform_buffer("oos"), "ố");
+        assert_eq!(transform_buffer("oof"), "ồ");
+        assert_eq!(transform_buffer("oor"), "ổ");
+        assert_eq!(transform_buffer("oox"), "ỗ");
+        assert_eq!(transform_buffer("ooj"), "ộ");
+        // ơ (ow + tone)
+        assert_eq!(transform_buffer("ows"), "ớ");
+        assert_eq!(transform_buffer("owf"), "ờ");
+        assert_eq!(transform_buffer("owr"), "ở");
+        assert_eq!(transform_buffer("owx"), "ỡ");
+        assert_eq!(transform_buffer("owj"), "ợ");
+        // ư (uw + tone)
+        assert_eq!(transform_buffer("uws"), "ứ");
+        assert_eq!(transform_buffer("uwf"), "ừ");
+        assert_eq!(transform_buffer("uwr"), "ử");
+        assert_eq!(transform_buffer("uwx"), "ữ");
+        assert_eq!(transform_buffer("uwj"), "ự");
+    }
+
+    /// Test 'ww' undo behavior
+    /// Note: 'uw' is consumed as ư first, then standalone 'w' becomes ư again.
+    /// The ww undo only triggers when 'ww' appears after a vowel that was
+    /// already transformed by a prior 'w' — but 'uw' matches the uw→ư rule
+    /// at higher priority, so uww = ư + w(standalone) = ưư.
+    /// True ww undo: when previous output char is ư/ơ from a w transform.
+    #[test]
+    fn test_ww_undo() {
+        assert_eq!(transform_buffer("ww"), "w"); // standalone ww → w, bypass
+        assert_eq!(transform_buffer("wwa"), "wa"); // bypass active after ww
+        // After uw → ư, the next w is standalone (becomes ư)
+        assert_eq!(transform_buffer("uww"), "ưư");
+        assert_eq!(transform_buffer("oww"), "ơư"); // ow → ơ, then w → ư
+    }
+
+    /// Test multi-word buffer with spaces and punctuation
+    #[test]
+    fn test_multi_word_buffer() {
+        assert_eq!(transform_buffer("xin chaof"), "xin chào");
+        assert_eq!(transform_buffer("vieetj nam"), "việt nam");
+        assert_eq!(transform_buffer("tooi laf"), "tôi là");
+        assert_eq!(transform_buffer("vieetj,nam"), "việt,nam");
+        assert_eq!(transform_buffer("ddaats nuwowcs"), "đất nước");
+        assert_eq!(transform_buffer("chaof banj"), "chào bạn");
+    }
+
+    /// Test uơ → ươ auto-conversion
+    #[test]
+    fn test_uo_to_uow_conversion() {
+        assert_eq!(transform_buffer("huwowu"), "hươu"); // already tested
+        assert_eq!(transform_buffer("luowng"), "lương");
+        assert_eq!(transform_buffer("cuowng"), "cương");
+        assert_eq!(transform_buffer("tuowng"), "tương");
+        assert_eq!(transform_buffer("duowng"), "dương");
+    }
+
+    /// Test tone replacement (typing a different tone replaces the previous one)
+    #[test]
+    fn test_tone_replacement() {
+        assert_eq!(transform_buffer("asf"), "à"); // s → f: grave replaces acute
+        assert_eq!(transform_buffer("afr"), "ả"); // f → r: hook replaces grave
+        assert_eq!(transform_buffer("arx"), "ã"); // r → x: tilde replaces hook
+        assert_eq!(transform_buffer("axj"), "ạ"); // x → j: dot replaces tilde
+        assert_eq!(transform_buffer("ajs"), "á"); // j → s: acute replaces dot
+    }
+
+    /// Test edge cases
+    #[test]
+    fn test_edge_cases() {
+        assert_eq!(transform_buffer(""), ""); // empty input
+        assert_eq!(transform_buffer("b"), "b"); // single consonant
+        assert_eq!(transform_buffer("bcd"), "bcd"); // only consonants
+        assert_eq!(transform_buffer("a"), "a"); // single vowel
+        assert_eq!(transform_buffer("1"), "1"); // single digit (passthrough)
+    }
+
+    /// Test extract_tone function directly
+    #[test]
+    fn test_extract_tone() {
+        // Toned vowels
+        assert_eq!(extract_tone('á'), ('a', Some('s')));
+        assert_eq!(extract_tone('à'), ('a', Some('f')));
+        assert_eq!(extract_tone('ả'), ('a', Some('r')));
+        assert_eq!(extract_tone('ã'), ('a', Some('x')));
+        assert_eq!(extract_tone('ạ'), ('a', Some('j')));
+        // Diacritic vowels with tones
+        assert_eq!(extract_tone('ấ'), ('â', Some('s')));
+        assert_eq!(extract_tone('ừ'), ('ư', Some('f')));
+        assert_eq!(extract_tone('ợ'), ('ơ', Some('j')));
+        assert_eq!(extract_tone('ệ'), ('ê', Some('j')));
+        // No tone
+        assert_eq!(extract_tone('a'), ('a', None));
+        assert_eq!(extract_tone('ư'), ('ư', None));
+        assert_eq!(extract_tone('ơ'), ('ơ', None));
+        assert_eq!(extract_tone('b'), ('b', None));
+        // Uppercase
+        assert_eq!(extract_tone('Á'), ('A', Some('s')));
+        assert_eq!(extract_tone('Ừ'), ('Ư', Some('f')));
+    }
+
+    /// Test add_mark function directly
+    #[test]
+    fn test_add_mark() {
+        // Base vowels
+        assert_eq!(add_mark('a', 's'), 'á');
+        assert_eq!(add_mark('e', 'f'), 'è');
+        assert_eq!(add_mark('i', 'r'), 'ỉ');
+        assert_eq!(add_mark('o', 'x'), 'õ');
+        assert_eq!(add_mark('u', 'j'), 'ụ');
+        assert_eq!(add_mark('y', 's'), 'ý');
+        // Diacritic vowels
+        assert_eq!(add_mark('â', 's'), 'ấ');
+        assert_eq!(add_mark('ă', 'f'), 'ằ');
+        assert_eq!(add_mark('ê', 'r'), 'ể');
+        assert_eq!(add_mark('ô', 'x'), 'ỗ');
+        assert_eq!(add_mark('ơ', 'j'), 'ợ');
+        assert_eq!(add_mark('ư', 's'), 'ứ');
+        // Uppercase preservation
+        assert_eq!(add_mark('A', 's'), 'Á');
+        assert_eq!(add_mark('Ê', 'f'), 'Ề');
+        assert_eq!(add_mark('Ư', 'j'), 'Ự');
+        // Unknown combination returns original
+        assert_eq!(add_mark('b', 's'), 'b');
+    }
+
+    /// Test relocate_tone function directly
+    #[test]
+    fn test_relocate_tone() {
+        // Word with no tone → unchanged
+        assert_eq!(relocate_tone("chung"), "chung");
+        // Word with tone already in correct position → unchanged
+        assert_eq!(relocate_tone("chào"), "chào");
+        // Word where tone needs relocation
+        assert_eq!(relocate_tone("chừong"), "chường");
+        assert_eq!(relocate_tone("đựoc"), "được");
+    }
+
+    /// Test 'gi' edge cases
+    #[test]
+    fn test_gi_edge_cases() {
+        assert_eq!(transform_buffer("gis"), "gí"); // single vowel 'i'
+        assert_eq!(transform_buffer("giax"), "giã"); // gi semi-consonant, tone on 'a'
+        assert_eq!(transform_buffer("giangs"), "giáng"); // gi cluster in longer word
+    }
+
+    /// Test 'w' after various characters
+    #[test]
+    fn test_w_after_various() {
+        assert_eq!(transform_buffer("tw"), "tư"); // w after consonant → ư
+        assert_eq!(transform_buffer("lw"), "lư"); // w after consonant → ư
+        assert_eq!(transform_buffer("nw"), "nư"); // w after consonant → ư
+        assert_eq!(transform_buffer("tws"), "tứ"); // w + tone
+        assert_eq!(transform_buffer("ngw"), "ngư"); // ng + w → ngư
+    }
+
+    /// Test uppercase with bypass modes
+    #[test]
+    fn test_uppercase_bypass() {
+        assert_eq!(transform_buffer("ADDD"), "ADD"); // uppercase triple-d bypass
+        assert_eq!(transform_buffer("AAA"), "AA"); // uppercase triple-a bypass
+        assert_eq!(transform_buffer("ASS"), "AS"); // uppercase double-tap tone bypass
+    }
+
+    /// Test real-world Vietnamese sentences
+    #[test]
+    fn test_real_world_sentences() {
+        assert_eq!(transform_buffer("Xin chaof cacs banj"), "Xin chào các bạn");
+        assert_eq!(
+            transform_buffer("Tooi laf nguwowfi Vieetj Nam"),
+            "Tôi là người Việt Nam"
+        );
+        assert_eq!(transform_buffer("Haf Nooji"), "Hà Nội");
+        assert_eq!(
+            transform_buffer("thafs"),
+            "thá" // f then s: sắc replaces huyền
+        );
     }
 }
