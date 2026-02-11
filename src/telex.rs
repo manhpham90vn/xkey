@@ -113,6 +113,7 @@ fn process_word(word: &str) -> String {
     let mut out_chars = Vec::new(); // Accumulated output characters
     let mut out_upper = Vec::new(); // Tracks case for each character (true = uppercase)
     let mut tone: Option<char> = None; // Current tone mark (s, f, r, x, j) or None
+    let mut bypass = false; // When true, skip Telex rules (word is English/raw)
 
     let original_chars: Vec<char> = word.chars().collect();
     let mut i = 0;
@@ -121,25 +122,63 @@ fn process_word(word: &str) -> String {
     while i < original_chars.len() {
         let current = original_chars[i];
         let current_lower = current.to_ascii_lowercase();
+
+        // If bypass mode is active, push raw characters without any transformation
+        if bypass {
+            out_chars.push(current_lower);
+            out_upper.push(current.is_uppercase());
+            i += 1;
+            continue;
+        }
+
         let next = original_chars.get(i + 1).cloned();
         let next_lower = next.map(|c| c.to_ascii_lowercase());
+        let third_lower = original_chars.get(i + 2).map(|c| c.to_ascii_lowercase());
 
         // Pattern matching for two-character vowel mark combinations and special cases
-        match (current_lower, next_lower) {
+        match (current_lower, next_lower, third_lower) {
+            // Triple-key undo: aaa → aa (undo â, activate bypass)
+            ('a', Some('a'), Some('a')) => {
+                out_chars.push('a');
+                out_upper.push(original_chars[i].is_uppercase());
+                out_chars.push('a');
+                out_upper.push(original_chars[i + 1].is_uppercase());
+                bypass = true;
+                i += 3;
+            }
+            // Triple-key undo: eee → ee (undo ê, activate bypass)
+            ('e', Some('e'), Some('e')) => {
+                out_chars.push('e');
+                out_upper.push(original_chars[i].is_uppercase());
+                out_chars.push('e');
+                out_upper.push(original_chars[i + 1].is_uppercase());
+                bypass = true;
+                i += 3;
+            }
+            // Triple-key undo: ooo → oo (undo ô, activate bypass)
+            ('o', Some('o'), Some('o')) => {
+                out_chars.push('o');
+                out_upper.push(original_chars[i].is_uppercase());
+                out_chars.push('o');
+                out_upper.push(original_chars[i + 1].is_uppercase());
+                bypass = true;
+                i += 3;
+            }
+
             // Circumflex (^) vowels
-            ('a', Some('a')) => {
+            ('a', Some('a'), _) => {
                 // aa → â (a with circumflex)
                 out_chars.push('â');
                 out_upper.push(current.is_uppercase());
                 i += 2;
             }
-            ('e', Some('e')) => {
+            ('e', Some('e'), _) => {
                 // ee → ê (e with circumflex)
                 out_chars.push('ê');
                 out_upper.push(current.is_uppercase());
                 i += 2;
             }
-            ('o', Some('o')) => {
+            ('o', Some('o'), _) => {
                 // oo → ô (o with circumflex)
                 out_chars.push('ô');
                 out_upper.push(current.is_uppercase());
@@ -147,27 +186,36 @@ fn process_word(word: &str) -> String {
             }
 
             // Breve (˘) and horn (ˆ) vowels using 'w'
-            ('a', Some('w')) => {
+            ('a', Some('w'), _) => {
                 // aw → ă (a with breve)
                 out_chars.push('ă');
                 out_upper.push(current.is_uppercase());
                 i += 2;
             }
-            ('o', Some('w')) => {
+            ('o', Some('w'), _) => {
                 // ow → ơ (o with horn)
                 out_chars.push('ơ');
                 out_upper.push(current.is_uppercase());
                 i += 2;
             }
-            ('u', Some('w')) => {
+            ('u', Some('w'), _) => {
                 // uw → ư (u with horn)
                 out_chars.push('ư');
                 out_upper.push(current.is_uppercase());
                 i += 2;
             }
 
+            // Triple-key undo: ddd → dd (undo đ, activate bypass)
+            ('d', Some('d'), Some('d')) => {
+                out_chars.push('d');
+                out_upper.push(original_chars[i].is_uppercase());
+                out_chars.push('d');
+                out_upper.push(original_chars[i + 1].is_uppercase());
+                bypass = true;
+                i += 3;
+            }
             // Đ with stroke
-            ('d', Some('d')) => {
+            ('d', Some('d'), _) => {
                 // dd → đ (d with stroke)
                 out_chars.push('đ');
                 out_upper.push(current.is_uppercase());
@@ -175,7 +223,7 @@ fn process_word(word: &str) -> String {
             }
 
             // Standalone 'w' shortcut for ư or ơ
-            ('w', _) => {
+            ('w', _, _) => {
                 // 'w' can transform the previous vowel or become 'ư' on its own
                 if let Some(&last) = out_chars.last() {
                     let last_lower = lower_char(last);
@@ -201,29 +249,31 @@ fn process_word(word: &str) -> String {
             }
 
             // Bracket shortcuts: '[' → ư, ']' → ơ
-            ('[', _) => {
+            ('[', _, _) => {
                 out_chars.push('ư');
                 out_upper.push(false);
                 i += 1;
             }
-            (']', _) => {
+            (']', _, _) => {
                 out_chars.push('ơ');
                 out_upper.push(false);
                 i += 1;
             }
 
             // Tone mark characters (only apply if we have a vowel to mark)
-            ('s', _) | ('f', _) | ('r', _) | ('x', _) | ('j', _) => {
+            ('s', _, _) | ('f', _, _) | ('r', _, _) | ('x', _, _) | ('j', _, _) => {
                 let vowels = "aeiouyâăêôơư";
                 let has_vowel = out_chars.iter().any(|c| vowels.contains(lower_char(*c)));
 
                 if has_vowel {
                     // Double-tap behavior: typing the same tone twice
                     // outputs the literal character (e.g., "ass" → "as")
+                    // Also activates bypass mode (word is likely English)
                     if tone == Some(current_lower) {
                         tone = None;
-                        out_chars.push(current);
+                        out_chars.push(current_lower);
                         out_upper.push(current.is_uppercase());
+                        bypass = true;
                     } else {
                         tone = Some(current_lower);
                     }
@@ -237,13 +287,15 @@ fn process_word(word: &str) -> String {
             }
 
             // 'z' key: remove any active tone mark
-            ('z', _) => {
+            // Also activates bypass mode (word is likely English)
+            ('z', _, _) => {
                 let vowels = "aeiouyâăêôơư";
                 let has_vowel = out_chars.iter().any(|c| vowels.contains(lower_char(*c)));
 
                 if has_vowel && tone.is_some() {
-                    // Remove the tone mark
+                    // Remove the tone mark and activate bypass
                     tone = None;
+                    bypass = true;
                 } else {
                     // No tone to remove or no vowel, treat as regular character
                     out_chars.push(current);
@@ -253,7 +305,7 @@ fn process_word(word: &str) -> String {
             }
 
             // Regular character, just pass it through unchanged
-            (c, _) => {
+            (c, _, _) => {
                 out_chars.push(c);
                 out_upper.push(current.is_uppercase());
                 i += 1;
@@ -263,6 +315,20 @@ fn process_word(word: &str) -> String {
 
     // Convert character vector to string for further processing
     let mut out_str: String = out_chars.into_iter().collect();
+
+    // If bypass mode was triggered, skip all Vietnamese-specific post-processing.
+    // Just restore case and return raw output.
+    if bypass {
+        let mut result = String::new();
+        for (i, ch) in out_str.chars().enumerate() {
+            if *out_upper.get(i).unwrap_or(&false) {
+                result.push(ch.to_uppercase().next().unwrap_or(ch));
+            } else {
+                result.push(ch);
+            }
+        }
+        return result;
+    }
 
     // Special rule: "uơ" should become "ươ" for words like "hươu" (deer)
     // This handles the case where 'ư' and 'ơ' appear together
@@ -821,13 +887,15 @@ mod tests {
         assert_eq!(transform_buffer("dduwowcj"), "được"); // formal way to type
     }
 
-    /// Test 'z' key removes tone mark
+    /// Test 'z' key removes tone mark and activates bypass
     #[test]
     fn test_z_remove_tone() {
-        assert_eq!(transform_buffer("asz"), "a"); // s then z removes tone
+        assert_eq!(transform_buffer("asz"), "a"); // s then z removes tone, bypass active
         assert_eq!(transform_buffer("aafz"), "â"); // â + f → ầ, z removes tone → â
         assert_eq!(transform_buffer("az"), "az"); // no tone to remove, literal z
         assert_eq!(transform_buffer("z"), "z"); // standalone z
+        // After z-remove, bypass is active: subsequent chars are raw
+        assert_eq!(transform_buffer("aszdd"), "add"); // bypass → 'dd' stays literal
     }
 
     /// Test bracket shortcuts for ư and ơ
@@ -837,5 +905,49 @@ mod tests {
         assert_eq!(transform_buffer("]"), "ơ"); // ] → ơ
         assert_eq!(transform_buffer("t[s"), "tứ"); // with tone
         assert_eq!(transform_buffer("h]s"), "hớ"); // with tone
+    }
+
+    /// Test bypass mode: triple-d undoes đ and activates raw mode
+    #[test]
+    fn test_bypass_triple_d() {
+        assert_eq!(transform_buffer("addd"), "add"); // ddd → bypass → raw "add"
+        assert_eq!(transform_buffer("addds"), "adds"); // bypass → 's' stays literal
+        assert_eq!(transform_buffer("addde"), "adde"); // bypass → 'e' stays literal
+        assert_eq!(transform_buffer("ddd"), "dd"); // standalone triple-d
+    }
+
+    /// Test bypass mode: triple vowel undoes diacritic and activates raw mode
+    #[test]
+    fn test_bypass_triple_vowel() {
+        assert_eq!(transform_buffer("aaa"), "aa"); // aaa → bypass → raw "aa"
+        assert_eq!(transform_buffer("aaas"), "aas"); // bypass → 's' stays literal
+        assert_eq!(transform_buffer("eee"), "ee"); // eee → bypass → raw "ee"
+        assert_eq!(transform_buffer("ooo"), "oo"); // ooo → bypass → raw "oo"
+    }
+
+    /// Test bypass mode: double-tap tone activates bypass
+    #[test]
+    fn test_bypass_double_tap_tone() {
+        assert_eq!(transform_buffer("ass"), "as"); // existing behavior preserved
+        assert_eq!(transform_buffer("assd"), "asd"); // bypass → 'd' stays literal
+        assert_eq!(transform_buffer("assdd"), "asdd"); // bypass → 'dd' stays literal
+    }
+
+    /// Test bypass mode: z-remove activates bypass
+    #[test]
+    fn test_bypass_z_remove() {
+        assert_eq!(transform_buffer("aszd"), "ad"); // z removes tone + bypass, d is raw
+        assert_eq!(transform_buffer("aszdd"), "add"); // bypass → 'dd' stays literal
+    }
+
+    /// Test that bypass does not affect normal transformations
+    #[test]
+    fn test_no_bypass_normal() {
+        assert_eq!(transform_buffer("dd"), "đ"); // existing behavior
+        assert_eq!(transform_buffer("vieetj"), "việt"); // existing behavior
+        assert_eq!(transform_buffer("chaof"), "chào"); // existing behavior
+        assert_eq!(transform_buffer("aa"), "â"); // existing behavior
+        assert_eq!(transform_buffer("ee"), "ê"); // existing behavior
+        assert_eq!(transform_buffer("oo"), "ô"); // existing behavior
     }
 }
