@@ -276,8 +276,19 @@ fn process_word(word: &str) -> String {
                         // Replace 'o' with 'ơ'
                         out_chars.pop();
                         out_chars.push('ơ');
+                    } else if last_lower == 'ă' {
+                        // Undo ă → a, then add literal 'w'
+                        // This handles the "awws" -> "aws" case
+                        let was_upper = *out_upper.last().unwrap_or(&false);
+                        out_chars.pop();
+                        out_upper.pop();
+                        out_chars.push('a');
+                        out_upper.push(was_upper);
+                        out_chars.push('w');
+                        out_upper.push(current.is_uppercase());
+                        bypass = true;
                     } else {
-                        // No preceding u/o, 'w' becomes 'ư'
+                        // No preceding u/o/ă, 'w' becomes 'ư'
                         out_chars.push('ư');
                         out_upper.push(current.is_uppercase());
                     }
@@ -1229,5 +1240,12 @@ mod tests {
             transform_buffer("thafs"),
             "thá" // f then s: sắc replaces huyền
         );
+    }
+
+    /// Test reproduction case for 'awws' -> 'aws'
+    #[test]
+    fn test_awws_repro() {
+        assert_eq!(transform_buffer("awws"), "aws");
+        assert_eq!(transform_buffer("aww"), "aw");
     }
 }
