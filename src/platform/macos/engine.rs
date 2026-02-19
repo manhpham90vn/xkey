@@ -211,11 +211,7 @@ extern "C" fn handle_event(
 /// We reset the CoreState for this controller to ensure clean state.
 ///
 /// Signature: -(void)activateServer:(id)sender
-extern "C" fn activate_server(
-    this: *mut AnyObject,
-    _cmd: Sel,
-    _sender: *mut AnyObject,
-) {
+extern "C" fn activate_server(this: *mut AnyObject, _cmd: Sel, _sender: *mut AnyObject) {
     // Reset buffer when switching to this input method
     with_core(this, |core| {
         core.buffer.clear();
@@ -228,11 +224,7 @@ extern "C" fn activate_server(
 /// We commit any pending text and clear the buffer.
 ///
 /// Signature: -(void)deactivateServer:(id)sender
-extern "C" fn deactivate_server(
-    this: *mut AnyObject,
-    _cmd: Sel,
-    sender: *mut AnyObject,
-) {
+extern "C" fn deactivate_server(this: *mut AnyObject, _cmd: Sel, sender: *mut AnyObject) {
     // Commit any pending text before deactivating
     let actions = with_core(this, |core| {
         if core.buffer.is_empty() {
@@ -240,10 +232,7 @@ extern "C" fn deactivate_server(
         }
         let text = crate::core::vi_transform(&core.buffer);
         core.buffer.clear();
-        vec![
-            Action::Commit(text),
-            Action::HidePreedit,
-        ]
+        vec![Action::Commit(text), Action::HidePreedit]
     });
 
     if !actions.is_empty() {
@@ -253,10 +242,7 @@ extern "C" fn deactivate_server(
 
 /// The inputControllerWillClose callback.
 /// Cleans up the per-controller CoreState from the HashMap.
-extern "C" fn input_controller_will_close(
-    this: *mut AnyObject,
-    _cmd: Sel,
-) {
+extern "C" fn input_controller_will_close(this: *mut AnyObject, _cmd: Sel) {
     remove_core(this);
 }
 
@@ -278,22 +264,19 @@ pub fn register_class() {
         // activateServer: — called when input method is activated
         builder.add_method(
             sel!(activateServer:),
-            activate_server
-                as extern "C" fn(*mut AnyObject, Sel, *mut AnyObject),
+            activate_server as extern "C" fn(*mut AnyObject, Sel, *mut AnyObject),
         );
 
         // deactivateServer: — called when input method is deactivated
         builder.add_method(
             sel!(deactivateServer:),
-            deactivate_server
-                as extern "C" fn(*mut AnyObject, Sel, *mut AnyObject),
+            deactivate_server as extern "C" fn(*mut AnyObject, Sel, *mut AnyObject),
         );
 
         // inputControllerWillClose — cleanup
         builder.add_method(
             sel!(inputControllerWillClose),
-            input_controller_will_close
-                as extern "C" fn(*mut AnyObject, Sel),
+            input_controller_will_close as extern "C" fn(*mut AnyObject, Sel),
         );
     }
 
