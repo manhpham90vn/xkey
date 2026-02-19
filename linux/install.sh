@@ -18,11 +18,14 @@
 # - GNOME desktop environment (for gsettings integration)
 #
 # Usage:
-#   ./install.sh
+#   ./linux/install.sh
 #
 # =============================================================================
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # =============================================================================
 # Helper Functions
@@ -108,15 +111,16 @@ echo "[1/6] Building xkey in release mode..."
 if ! command -v cargo >/dev/null 2>&1; then
   die "Rust is not installed. Please install it from https://rustup.rs/ before running this script."
 fi
+cd "$PROJECT_DIR"
 cargo build --release
 
 # Step 3: Install the binary
 echo "[2/6] Installing binary to /usr/libexec/..."
-sudo install -m 0755 target/release/xkey /usr/libexec/ibus-engine-xkey
+sudo install -m 0755 "$PROJECT_DIR/target/release/xkey" /usr/libexec/ibus-engine-xkey
 
 # Step 4: Install the IBus component XML
 echo "[3/6] Installing component XML to /usr/share/ibus/component/..."
-sudo install -D -m 0644 xkey.xml /usr/share/ibus/component/xkey.xml
+sudo install -D -m 0644 "$SCRIPT_DIR/xkey.xml" /usr/share/ibus/component/xkey.xml
 
 # Step 5: Restart IBus daemon to pick up the new engine
 echo "[4/6] Restarting IBus..."
