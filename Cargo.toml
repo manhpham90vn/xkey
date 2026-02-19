@@ -1,9 +1,9 @@
 [package]
 name = "xkey"
-version = "0.9.0"
+version = "1.0.0"
 edition = "2024"
 repository = "https://github.com/manhpham90vn/xkey"
-description = "A lightweight Vietnamese Telex input method for Linux (IBus) and macOS (InputMethodKit)"
+description = "A lightweight Vietnamese Telex input method for Linux (IBus), macOS (InputMethodKit), and Windows (keyboard hook)"
 license = "MIT"
 
 
@@ -22,6 +22,14 @@ objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSEvent", "NSRe
 objc2-input-method-kit = "0.3"
 block2 = "0.6"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Foundation",
+] }
+ctrlc = "3"
+
 [package.metadata.deb]
 name = "xkey"
 maintainer = "Manh Pham <h3x4r@yahoo.com>"
@@ -35,6 +43,6 @@ assets = [
     ["linux/xkey.xml", "/usr/share/ibus/component/xkey.xml", "644"],
 ]
 extended-description = """
-XKey is a lightweight Vietnamese Telex input method for Linux (IBus) and macOS (InputMethodKit).
+XKey is a lightweight Vietnamese Telex input method for Linux (IBus), macOS (InputMethodKit), and Windows (keyboard hook).
 It supports standard Telex rules and smart tone placement.
 """

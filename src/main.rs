@@ -4,6 +4,7 @@
 //! 1. Input Method Mode (default):
 //!    - **Linux**: Connects to IBus daemon via D-Bus
 //!    - **macOS**: Runs as InputMethodKit server
+//!    - **Windows**: Runs as background process with keyboard hook
 //! 2. REPL Mode (--repl flag): Interactive terminal mode for testing Telex transformations
 
 mod core;
@@ -28,6 +29,8 @@ use repl::repl;
 /// Connects to IBus daemon via D-Bus, registers as an IBus engine.
 /// ### macOS
 /// Creates an IMKServer instance and runs the NSApplication event loop.
+/// ### Windows
+/// Installs a low-level keyboard hook and runs a message loop.
 #[cfg(target_os = "linux")]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -49,4 +52,15 @@ fn main() -> anyhow::Result<()> {
     }
 
     platform::macos::run()
+}
+
+#[cfg(target_os = "windows")]
+fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.iter().any(|a| a == "--repl") {
+        return repl();
+    }
+
+    platform::windows::run()
 }
