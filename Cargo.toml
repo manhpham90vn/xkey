@@ -1,6 +1,6 @@
 [package]
 name = "xkey"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2024"
 repository = "https://github.com/manhpham90vn/xkey"
 description = "A lightweight Vietnamese Telex input method for Linux (IBus) and macOS (InputMethodKit)"

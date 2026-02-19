@@ -5,8 +5,8 @@
 
 pub mod engine;
 
-use objc2::rc::Retained;
 use objc2::AllocAnyThread;
+use objc2::rc::Retained;
 use objc2_app_kit::NSApplication;
 use objc2_foundation::{MainThreadMarker, NSString};
 use objc2_input_method_kit::IMKServer;
@@ -24,8 +24,7 @@ pub fn run() -> anyhow::Result<()> {
     engine::register_class();
 
     // We must be on the main thread for NSApplication
-    let mtm = MainThreadMarker::new()
-        .expect("Must be called from the main thread");
+    let mtm = MainThreadMarker::new().expect("Must be called from the main thread");
 
     let app = NSApplication::sharedApplication(mtm);
 

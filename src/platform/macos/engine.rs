@@ -39,8 +39,6 @@ fn modifiers_to_state(flags: u64) -> u32 {
     state
 }
 
-
-
 /// Applies actions returned by core::handle_key to the macOS input client.
 fn apply_actions(client: *mut AnyObject, actions: Vec<Action>) -> bool {
     let mut consumed = false;
@@ -154,19 +152,15 @@ extern "C" fn handle_event(
     });
 
     let consumed = apply_actions(client, actions);
-    if consumed {
-        Bool::YES
-    } else {
-        Bool::NO
-    }
+    if consumed { Bool::YES } else { Bool::NO }
 }
 
 /// Register the XKeyInputController class with the Objective-C runtime.
 pub fn register_class() {
     let superclass = class!(IMKInputController);
     let name = c"XKeyInputController";
-    let mut builder = ClassBuilder::new(name, superclass)
-        .expect("Failed to create XKeyInputController class");
+    let mut builder =
+        ClassBuilder::new(name, superclass).expect("Failed to create XKeyInputController class");
 
     unsafe {
         builder.add_method(
@@ -178,4 +172,3 @@ pub fn register_class() {
 
     builder.register();
 }
-
