@@ -51,7 +51,7 @@ cd xkey
 
 #### Prerequisites
 
-- [Rust](https://www.rust-lang.org/tools/install)
+- [Rust](https://www.rust-lang.org/tools/install) (only for building from source)
 
 #### Option 1: Download App Bundle (Recommended)
 
