@@ -54,8 +54,14 @@ cp target/release/xkey "$APP_BUNDLE/Contents/MacOS/xkey"
 # Copy Info.plist
 cp "$SCRIPT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
+# Copy icon
+cp "$SCRIPT_DIR/xkey.icns" "$APP_BUNDLE/Contents/Resources/xkey.icns"
+
 # Create PkgInfo
 echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
+
+# Remove quarantine attribute (app is unsigned)
+xattr -cr "$APP_BUNDLE"
 
 echo "[3/3] Installed to: $APP_BUNDLE"
 echo ""

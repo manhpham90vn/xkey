@@ -58,8 +58,20 @@ cd xkey
 1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
 2. Download `xkey-macos.zip`
 3. Unzip and move `XKey.app` to `~/Library/Input Methods/`
-4. Log out and log back in
-5. Add xkey via **System Settings > Keyboard > Input Sources > + > Vietnamese > XKey Vietnamese Telex**
+4. **Bypass Gatekeeper** (the app is not signed with an Apple Developer Certificate):
+   - Open Terminal and run:
+     ```bash
+     xattr -cr ~/Library/Input\ Methods/XKey.app
+     ```
+   - Or if you see **"XKey.app can't be opened because Apple cannot check it for malicious software"**:
+     1. Open **System Settings > Privacy & Security**
+     2. Scroll down to the **Security** section, find the message about `XKey.app`
+     3. Click **Open Anyway**
+5. Log out and log back in
+6. Add xkey via **System Settings > Keyboard > Input Sources > + > Vietnamese > XKey Vietnamese Telex**
+
+> [!WARNING]
+> The app is not signed with an Apple Developer Certificate, so macOS will block it on first launch. You must complete step 4 to allow it to run.
 
 #### Option 2: Build from Source
 
