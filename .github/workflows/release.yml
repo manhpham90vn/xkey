@@ -26,7 +26,6 @@ jobs:
       - name: Stage artifacts
         run: |
           mkdir -p dist
-          cp target/release/xkey dist/xkey-linux
           cp target/debian/*.deb dist/
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -41,14 +40,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build Release
+      - name: Build Rust staticlib
         run: cargo build --release
+      - name: Build Swift app
+        run: |
+          swiftc macos/main.swift macos/Engine.swift \
+            -import-objc-header macos/xkey-Bridging-Header.h \
+            -L target/release -lxkey \
+            -o target/release/xkey_mac
       - name: Create app bundle
         run: |
           mkdir -p XKey.app/Contents/MacOS
           mkdir -p XKey.app/Contents/Resources
-          cp target/release/xkey XKey.app/Contents/MacOS/xkey
+          cp target/release/xkey_mac XKey.app/Contents/MacOS/xkey
           cp macos/Info.plist XKey.app/Contents/Info.plist
+          cp macos/xkey.icns XKey.app/Contents/Resources/xkey.icns
           echo -n "APPL????" > XKey.app/Contents/PkgInfo
       - name: Create zip
         run: zip -r xkey-macos.zip XKey.app
