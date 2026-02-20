@@ -35,21 +35,28 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 echo "=== XKey macOS Installation ==="
 echo ""
 
-# Step 1: Build the project in release mode
-echo "[1/3] Building xkey in release mode..."
+# Step 1: Build the Rust core in release mode
+echo "[1/4] Building Rust core in release mode..."
 if ! command -v cargo >/dev/null 2>&1; then
   die "Rust is not installed. Please install it from https://rustup.rs/"
 fi
 cd "$PROJECT_DIR"
 cargo build --release
 
-# Step 2: Create the .app bundle
-echo "[2/3] Creating app bundle..."
+# Step 2: Build the Swift application
+echo "[2/4] Compiling Swift macOS app..."
+swiftc macos/main.swift macos/Engine.swift \
+  -import-objc-header macos/xkey-Bridging-Header.h \
+  -L target/release -lxkey \
+  -o target/release/xkey_mac
+
+# Step 3: Create the .app bundle
+echo "[3/4] Creating app bundle..."
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 # Copy binary
-cp target/release/xkey "$APP_BUNDLE/Contents/MacOS/xkey"
+cp target/release/xkey_mac "$APP_BUNDLE/Contents/MacOS/xkey"
 
 # Copy Info.plist
 cp "$SCRIPT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
@@ -63,7 +70,7 @@ echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 # Remove quarantine attribute (app is unsigned)
 xattr -cr "$APP_BUNDLE"
 
-echo "[3/3] Installed to: $APP_BUNDLE"
+echo "[4/4] Installed to: $APP_BUNDLE"
 echo ""
 echo "=== Installation complete! ==="
 echo ""

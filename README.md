@@ -155,6 +155,7 @@ ibus restart
 ```
 src/
 ├── main.rs              # Entry point, platform dispatch
+├── lib.rs               # Library exports (for FFI + doctests)
 ├── core.rs              # Buffer management, input logic
 ├── telex.rs             # Telex transformation rules
 ├── repl.rs              # REPL mode
@@ -165,8 +166,15 @@ src/
     │   ├── mod.rs        # IBus startup logic
     │   └── engine.rs     # IBus D-Bus engine
     └── macos/
-        ├── mod.rs        # InputMethodKit startup
-        └── engine.rs     # IMK input controller
+        └── mod.rs        # C FFI exports for Swift bridge
+
+macos/
+├── main.swift            # macOS app entry point (IMKServer)
+├── Engine.swift          # InputMethodKit engine (Swift)
+├── xkey-Bridging-Header.h # C-to-Swift bridging header
+├── Info.plist            # App bundle configuration
+├── install.sh            # Build & install script
+└── clean.sh              # Uninstall script
 ```
 
 | Module                  | Description                                             |
@@ -174,7 +182,8 @@ src/
 | `core.rs`               | Manages input buffer, decides when to transform/commit  |
 | `telex.rs`              | Implements Vietnamese Telex transformation rules        |
 | `platform/linux/`       | IBus engine via D-Bus (zbus) — Linux only               |
-| `platform/macos/`       | InputMethodKit controller (objc2) — macOS only          |
+| `platform/macos/mod.rs` | C FFI exports for the Swift bridge — macOS only         |
+| `macos/Engine.swift`    | InputMethodKit controller (Swift) — macOS only          |
 
 ## Development
 
