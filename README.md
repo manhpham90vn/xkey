@@ -19,16 +19,7 @@ A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBu
 
 ### Linux (Ubuntu)
 
-#### Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install) (only for building from source)
-- IBus daemon
-- Build dependencies:
-  ```bash
-  sudo apt install libdbus-1-dev pkg-config ibus
-  ```
-
-#### Option 1: Download .deb Package (Recommended)
+#### Download .deb Package (Recommended)
 
 1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
 2. Download the latest `.deb` file
@@ -39,8 +30,14 @@ A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBu
    ```
 4. Add xkey via **Settings > Keyboard > Input Sources > Add Input Source... > ⋮ > Other > Vietnamese (XKey Vietnamese Telex) > Add**
 
-#### Option 2: Build from Source
+#### Build from Source
 
+Install prerequisites first:
+```bash
+sudo apt install libdbus-1-dev pkg-config ibus
+```
+
+You also need [Rust](https://www.rust-lang.org/tools/install). Then:
 ```bash
 git clone https://github.com/manhpham90vn/xkey.git
 cd xkey
@@ -49,11 +46,7 @@ cd xkey
 
 ### macOS
 
-#### Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install) (only for building from source)
-
-#### Option 1: Download App Bundle (Recommended)
+#### Download App Bundle (Recommended)
 
 1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
 2. Download `xkey-macos.zip`
@@ -73,8 +66,9 @@ cd xkey
 > [!WARNING]
 > The app is not signed with an Apple Developer Certificate, so macOS will block it on first launch. You must complete step 4 to allow it to run.
 
-#### Option 2: Build from Source
+#### Build from Source
 
+Install [Rust](https://www.rust-lang.org/tools/install) first, then:
 ```bash
 git clone https://github.com/manhpham90vn/xkey.git
 cd xkey
@@ -168,11 +162,17 @@ src/
     └── macos/
         └── mod.rs        # C FFI exports for Swift bridge
 
+linux/
+├── install.sh            # Build & install script
+├── clean.sh              # Uninstall script
+└── xkey.xml              # IBus engine descriptor
+
 macos/
 ├── main.swift            # macOS app entry point (IMKServer)
 ├── Engine.swift          # InputMethodKit engine (Swift)
 ├── xkey-Bridging-Header.h # C-to-Swift bridging header
 ├── Info.plist            # App bundle configuration
+├── xkey.icns             # App icon
 ├── install.sh            # Build & install script
 └── clean.sh              # Uninstall script
 ```
