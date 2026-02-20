@@ -48,5 +48,10 @@ fn main() -> anyhow::Result<()> {
         return repl();
     }
 
-    platform::macos::run()
+    // On macOS, the actual application is the Swift-based XKey.app bundle.
+    // Compiling the Rust program directly just builds this executable which isn't used
+    // except for REPL.
+    eprintln!("On macOS, XKey runs as a native app bundle using InputMethodKit.");
+    eprintln!("Please build and install the app using ./macos/install.sh instead.");
+    Ok(())
 }

@@ -41,6 +41,12 @@ pub struct XKey {
     pub st: Arc<Mutex<EngineState>>,
 }
 
+impl Default for XKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl XKey {
     /// Creates a new XKey engine instance with default state.
     pub fn new() -> Self {
@@ -295,6 +301,12 @@ impl XKey {
 /// In XKey, we use a single shared engine instance, so the factory simply returns
 /// the path to our pre-registered engine.
 pub struct XKeyFactory;
+
+impl Default for XKeyFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl XKeyFactory {
     /// Creates a new factory instance.
