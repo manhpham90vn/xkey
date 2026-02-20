@@ -6,6 +6,8 @@ repository = "https://github.com/manhpham90vn/xkey"
 description = "A lightweight Vietnamese Telex input method for Linux (IBus), macOS (InputMethodKit), and Windows (keyboard hook)"
 license = "MIT"
 
+[lib]
+crate-type = ["lib", "staticlib"]
 
 [dependencies]
 anyhow = "1"
@@ -15,12 +17,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
 zbus = { version = "4", features = ["tokio"] }
 zvariant = "4"
 
+# No specific dependencies needed for the macOS Rust staticlib as we handle FFI manually
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSString", "NSRange"] }
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSEvent", "NSResponder"] }
-objc2-input-method-kit = "0.3"
-block2 = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = [

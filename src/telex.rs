@@ -54,6 +54,7 @@
 ///
 /// # Examples
 /// ```
+/// use xkey::telex::transform_buffer;
 /// assert_eq!(transform_buffer("xin chaof"), "xin chào");
 /// assert_eq!(transform_buffer("vieetj,nam"), "việt,nam");
 /// ```

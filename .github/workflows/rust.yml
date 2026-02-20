@@ -57,8 +57,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build
+      - name: Build Rust
         run: cargo build --verbose
+      - name: Build Swift app
+        run: |
+          swiftc macos/main.swift macos/Engine.swift \
+            -import-objc-header macos/xkey-Bridging-Header.h \
+            -L target/debug -lxkey \
+            -o target/debug/xkey_mac
       - name: Run tests
         run: cargo test --verbose
 

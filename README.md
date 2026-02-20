@@ -19,16 +19,7 @@ A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBu
 
 ### Linux (Ubuntu)
 
-#### Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install) (only for building from source)
-- IBus daemon
-- Build dependencies:
-  ```bash
-  sudo apt install libdbus-1-dev pkg-config ibus
-  ```
-
-#### Option 1: Download .deb Package (Recommended)
+#### Download .deb Package (Recommended)
 
 1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
 2. Download the latest `.deb` file
@@ -39,8 +30,14 @@ A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBu
    ```
 4. Add xkey via **Settings > Keyboard > Input Sources > Add Input Source... > ⋮ > Other > Vietnamese (XKey Vietnamese Telex) > Add**
 
-#### Option 2: Build from Source
+#### Build from Source
 
+Install prerequisites first:
+```bash
+sudo apt install libdbus-1-dev pkg-config ibus
+```
+
+You also need [Rust](https://www.rust-lang.org/tools/install). Then:
 ```bash
 git clone https://github.com/manhpham90vn/xkey.git
 cd xkey
@@ -49,11 +46,15 @@ cd xkey
 
 ### macOS
 
+<<<<<<< HEAD
 #### Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install)
 
 #### Option 1: Download App Bundle (Recommended)
+=======
+#### Download App Bundle (Recommended)
+>>>>>>> master
 
 1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
 2. Download `xkey-macos.zip`
@@ -61,8 +62,9 @@ cd xkey
 4. Log out and log back in
 5. Add xkey via **System Settings > Keyboard > Input Sources > + > Vietnamese > XKey Vietnamese Telex**
 
-#### Option 2: Build from Source
+#### Build from Source
 
+Install [Rust](https://www.rust-lang.org/tools/install) first, then:
 ```bash
 git clone https://github.com/manhpham90vn/xkey.git
 cd xkey
@@ -185,6 +187,7 @@ ibus restart
 ```
 src/
 ├── main.rs              # Entry point, platform dispatch
+├── lib.rs               # Library exports (for FFI + doctests)
 ├── core.rs              # Buffer management, input logic
 ├── telex.rs             # Telex transformation rules
 ├── repl.rs              # REPL mode
@@ -194,12 +197,22 @@ src/
     ├── linux/
     │   ├── mod.rs        # IBus startup logic
     │   └── engine.rs     # IBus D-Bus engine
-    ├── macos/
-    │   ├── mod.rs        # InputMethodKit startup
-    │   └── engine.rs     # IMK input controller
-    └── windows/
-        ├── mod.rs        # Keyboard hook setup & message loop
-        └── engine.rs     # Hook callback & SendInput injection
+    └── macos/
+        └── mod.rs        # C FFI exports for Swift bridge
+
+linux/
+├── install.sh            # Build & install script
+├── clean.sh              # Uninstall script
+└── xkey.xml              # IBus engine descriptor
+
+macos/
+├── main.swift            # macOS app entry point (IMKServer)
+├── Engine.swift          # InputMethodKit engine (Swift)
+├── xkey-Bridging-Header.h # C-to-Swift bridging header
+├── Info.plist            # App bundle configuration
+├── xkey.icns             # App icon
+├── install.sh            # Build & install script
+└── clean.sh              # Uninstall script
 ```
 
 | Module                  | Description                                             |
@@ -207,8 +220,8 @@ src/
 | `core.rs`               | Manages input buffer, decides when to transform/commit  |
 | `telex.rs`              | Implements Vietnamese Telex transformation rules        |
 | `platform/linux/`       | IBus engine via D-Bus (zbus) — Linux only               |
-| `platform/macos/`       | InputMethodKit controller (objc2) — macOS only          |
-| `platform/windows/`     | Keyboard hook + SendInput (windows-rs) — Windows only   |
+| `platform/macos/mod.rs` | C FFI exports for the Swift bridge — macOS only         |
+| `macos/Engine.swift`    | InputMethodKit controller (Swift) — macOS only          |
 
 ## Development
 
