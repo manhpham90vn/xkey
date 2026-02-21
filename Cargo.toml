@@ -3,7 +3,7 @@ name = "xkey"
 version = "1.0.0"
 edition = "2024"
 repository = "https://github.com/manhpham90vn/xkey"
-description = "A lightweight Vietnamese Telex input method for Linux (IBus) and macOS (InputMethodKit)"
+description = "A lightweight Vietnamese Telex input method for Linux (IBus), macOS (InputMethodKit), and Windows (keyboard hook)"
 license = "MIT"
 
 [lib]
@@ -20,6 +20,18 @@ zvariant = "4"
 # No specific dependencies needed for the macOS Rust staticlib as we handle FFI manually
 [target.'cfg(target_os = "macos")'.dependencies]
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Foundation",
+] }
+ctrlc = "3"
+tray-item = "0.10.0"
+
+[build-dependencies]
+embed-resource = "3.0.6"
+
 [package.metadata.deb]
 name = "xkey"
 maintainer = "Manh Pham <h3x4r@yahoo.com>"
@@ -33,6 +45,6 @@ assets = [
     ["linux/xkey.xml", "/usr/share/ibus/component/xkey.xml", "644"],
 ]
 extended-description = """
-XKey is a lightweight Vietnamese Telex input method for Linux (IBus) and macOS (InputMethodKit).
+XKey is a lightweight Vietnamese Telex input method for Linux (IBus), macOS (InputMethodKit), and Windows (keyboard hook).
 It supports standard Telex rules and smart tone placement.
 """

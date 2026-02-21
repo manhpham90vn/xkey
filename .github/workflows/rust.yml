@@ -67,3 +67,25 @@ jobs:
             -o target/debug/xkey_mac
       - name: Run tests
         run: cargo test --verbose
+
+  check-windows:
+    name: Check & Clippy (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rustup show
+        run: rustup show
+      - name: Cargo fmt
+        run: cargo fmt --check
+      - name: Cargo clippy
+        run: cargo clippy -- -D warnings
+
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
