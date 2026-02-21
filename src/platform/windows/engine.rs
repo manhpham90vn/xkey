@@ -36,7 +36,7 @@ static SENDING: AtomicBool = AtomicBool::new(false);
 // we track how many characters we've sent so we can backspace them
 // when updating the composition.
 thread_local! {
-    static PREEDIT_LEN: RefCell<usize> = RefCell::new(0);
+    static PREEDIT_LEN: RefCell<usize> = const { RefCell::new(0) };
 }
 
 /// Checks if a modifier key (Ctrl, Alt, Win) is currently held down.

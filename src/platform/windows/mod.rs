@@ -6,11 +6,11 @@
 
 pub mod engine;
 
+use tray_item::{IconSource, TrayItem};
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, GetMessageW, MSG, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
     WH_KEYBOARD_LL,
 };
-use tray_item::{IconSource, TrayItem};
 
 /// Starts the Windows keyboard hook and runs the message loop.
 ///
@@ -46,10 +46,10 @@ pub fn run() -> anyhow::Result<()> {
     // Initialize System Tray
     let mut tray = TrayItem::new("XKey", IconSource::Resource("tray-default"))
         .map_err(|e| anyhow::anyhow!("Tray error: {}", e))?;
-    
+
     tray.add_label("XKey Vietnamese Input")
         .map_err(|e| anyhow::anyhow!("{}", e))?;
-        
+
     let quit_hook_raw = hook_raw;
     tray.add_menu_item("Quit", move || {
         unsafe {

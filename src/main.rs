@@ -7,10 +7,7 @@
 //!    - **Windows**: Runs as background process with keyboard hook
 //! 2. REPL Mode (--repl flag): Interactive terminal mode for testing Telex transformations
 
-#![cfg_attr(
-    target_os = "windows",
-    windows_subsystem = "windows"
-)]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod core;
 mod platform;
