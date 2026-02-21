@@ -4,13 +4,13 @@
 [![Release](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml/badge.svg)](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBus) and **macOS** (InputMethodKit). Written in Rust.
+A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBus), **macOS** (InputMethodKit), and **Windows**. Written in Rust.
 
 ## Features
 
 - **Standard Telex** - Full Vietnamese Telex rules support
 - **Smart Tone Placement** - Automatically places tone marks correctly
-- **Cross-Platform** - Linux (IBus engine) and macOS (InputMethodKit)
+- **Cross-Platform** - Linux (IBus), macOS (InputMethodKit), and Windows (Low-level Keyboard Hook)
 - **REPL Mode** - Test transformations directly in terminal
 - **Lightweight** - Minimal resources, fast response
 - **Memory Safe** - Built with Rust
@@ -83,6 +83,25 @@ The install script will:
 > [!NOTE]
 > After installation, you must **log out and log back in** for macOS to detect the new input method.
 
+### Windows
+
+#### Download Pre-compiled Binary
+
+1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
+2. Download `xkey-windows.zip`
+3. Extract and run `xkey.exe`
+
+#### Build from Source
+
+Ensure you have [Rust](https://www.rust-lang.org/tools/install) installed, then:
+```powershell
+git clone https://github.com/manhpham90vn/xkey.git
+cd xkey
+.\windows\install.ps1
+```
+
+The install script will build `xkey` in release mode and copy the executable to `%LOCALAPPDATA%\XKey`.
+
 ### Uninstall
 
 **Linux:**
@@ -96,6 +115,11 @@ The install script will:
 ```
 Then log out and log back in.
 
+**Windows:**
+```powershell
+.\windows\clean.ps1
+```
+
 ## Usage
 
 ### As Input Method
@@ -104,6 +128,7 @@ Once installed, switch input methods using:
 
 - **Linux**: Super + Space (GNOME default) or IBus tray icon
 - **macOS**: Ctrl + Space or globe key (⌘)
+- **Windows**: Runs in the background (check the system tray icon to pause/resume or quit)
 
 ### Telex Typing
 
@@ -144,6 +169,11 @@ ibus restart
 2. Log out and log back in
 3. Check Console.app for any InputMethodKit errors
 
+**Windows - xkey not typing Vietnamese:**
+
+1. Ensure the `xkey.exe` process is running in the background.
+2. Check the system tray icon to ensure it's not paused.
+
 ## Architecture
 
 ```
@@ -159,8 +189,11 @@ src/
     ├── linux/
     │   ├── mod.rs        # IBus startup logic
     │   └── engine.rs     # IBus D-Bus engine
-    └── macos/
-        └── mod.rs        # C FFI exports for Swift bridge
+    ├── macos/
+    │   └── mod.rs        # C FFI exports for Swift bridge
+    └── windows/
+        ├── mod.rs        # Setup hook and tray icon
+        └── engine.rs     # Low-level keyboard hook callback
 
 linux/
 ├── install.sh            # Build & install script
@@ -175,6 +208,13 @@ macos/
 ├── xkey.icns             # App icon
 ├── install.sh            # Build & install script
 └── clean.sh              # Uninstall script
+
+windows/
+├── install.ps1           # Build & install script
+├── clean.ps1             # Uninstall script
+├── icon.ico              # System tray icon
+└── icon.rc               # Windows resource for icon
+
 ```
 
 | Module                  | Description                                             |
@@ -184,6 +224,7 @@ macos/
 | `platform/linux/`       | IBus engine via D-Bus (zbus) — Linux only               |
 | `platform/macos/mod.rs` | C FFI exports for the Swift bridge — macOS only         |
 | `macos/Engine.swift`    | InputMethodKit controller (Swift) — macOS only          |
+| `platform/windows/`     | Low-level keyboard hook — Windows only                  |
 
 ## Development
 
@@ -200,8 +241,8 @@ cargo clippy
 
 ## CI/CD
 
-- **CI**: Automated build and test on every push (Linux + macOS)
-- **Release**: Build and publish binaries for both platforms when pushing tags (`v*`)
+- **CI**: Automated build and test on every push (Linux, macOS, and Windows)
+- **Release**: Build and publish binaries for all platforms when pushing tags (`v*`)
 
 ## License
 
