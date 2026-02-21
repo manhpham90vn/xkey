@@ -4,13 +4,13 @@
 [![Release](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml/badge.svg)](https://github.com/manhpham90vn/xkey/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBus), **macOS** (InputMethodKit), and **Windows** (keyboard hook). Written in Rust.
+A lightweight, high-performance Vietnamese Telex input method for **Linux** (IBus) and **macOS** (InputMethodKit). Written in Rust.
 
 ## Features
 
 - **Standard Telex** - Full Vietnamese Telex rules support
 - **Smart Tone Placement** - Automatically places tone marks correctly
-- **Cross-Platform** - Linux (IBus engine), macOS (InputMethodKit), and Windows (keyboard hook)
+- **Cross-Platform** - Linux (IBus engine) and macOS (InputMethodKit)
 - **REPL Mode** - Test transformations directly in terminal
 - **Lightweight** - Minimal resources, fast response
 - **Memory Safe** - Built with Rust
@@ -46,21 +46,25 @@ cd xkey
 
 ### macOS
 
-<<<<<<< HEAD
-#### Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install)
-
-#### Option 1: Download App Bundle (Recommended)
-=======
 #### Download App Bundle (Recommended)
->>>>>>> master
 
 1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
 2. Download `xkey-macos.zip`
 3. Unzip and move `XKey.app` to `~/Library/Input Methods/`
-4. Log out and log back in
-5. Add xkey via **System Settings > Keyboard > Input Sources > + > Vietnamese > XKey Vietnamese Telex**
+4. **Bypass Gatekeeper** (the app is not signed with an Apple Developer Certificate):
+   - Open Terminal and run:
+     ```bash
+     xattr -cr ~/Library/Input\ Methods/XKey.app
+     ```
+   - Or if you see **"XKey.app can't be opened because Apple cannot check it for malicious software"**:
+     1. Open **System Settings > Privacy & Security**
+     2. Scroll down to the **Security** section, find the message about `XKey.app`
+     3. Click **Open Anyway**
+5. Log out and log back in
+6. Add xkey via **System Settings > Keyboard > Input Sources > + > Vietnamese > XKey Vietnamese Telex**
+
+> [!WARNING]
+> The app is not signed with an Apple Developer Certificate, so macOS will block it on first launch. You must complete step 4 to allow it to run.
 
 #### Build from Source
 
@@ -79,36 +83,6 @@ The install script will:
 > [!NOTE]
 > After installation, you must **log out and log back in** for macOS to detect the new input method.
 
-### Windows
-
-#### Prerequisites
-
-- [Rust](https://www.rust-lang.org/tools/install)
-
-#### Option 1: Download Executable (Recommended)
-
-1. Go to the [Releases](https://github.com/manhpham90vn/xkey/releases) page
-2. Download `xkey-windows.zip`
-3. Extract `xkey.exe` to a folder (e.g., `C:\Program Files\XKey\`)
-4. Run `xkey.exe` — it runs as a background process
-5. (Optional) Add to Windows startup by placing a shortcut in `shell:startup`
-
-#### Option 2: Build from Source
-
-```powershell
-git clone https://github.com/manhpham90vn/xkey.git
-cd xkey
-.\windows\install.ps1
-```
-
-The install script will:
-- Build in release mode (`cargo build --release`)
-- Copy `xkey.exe` to `%LOCALAPPDATA%\XKey\`
-- Add to Windows startup (Registry Run key)
-
-> [!NOTE]
-> XKey runs as a background process using a keyboard hook. It intercepts keystrokes and injects Vietnamese characters via `SendInput`. Press **Ctrl+C** in the terminal to stop, or end the xkey process from Task Manager.
-
 ### Uninstall
 
 **Linux:**
@@ -122,11 +96,6 @@ The install script will:
 ```
 Then log out and log back in.
 
-**Windows:**
-```powershell
-.\windows\clean.ps1
-```
-
 ## Usage
 
 ### As Input Method
@@ -135,7 +104,6 @@ Once installed, switch input methods using:
 
 - **Linux**: Super + Space (GNOME default) or IBus tray icon
 - **macOS**: Ctrl + Space or globe key (⌘)
-- **Windows**: Run `xkey.exe` to activate (runs in background)
 
 ### Telex Typing
 
@@ -175,12 +143,6 @@ ibus restart
 1. Make sure `XKey.app` is in `~/Library/Input Methods/`
 2. Log out and log back in
 3. Check Console.app for any InputMethodKit errors
-
-**Windows - xkey not working:**
-
-1. Make sure `xkey.exe` is running (check Task Manager)
-2. Some elevated (Administrator) applications may not receive injected input due to UIPI
-3. If keystrokes are not intercepted, try running `xkey.exe` as Administrator
 
 ## Architecture
 
@@ -238,8 +200,8 @@ cargo clippy
 
 ## CI/CD
 
-- **CI**: Automated build and test on every push (Linux + macOS + Windows)
-- **Release**: Build and publish binaries for all three platforms when pushing tags (`v*`)
+- **CI**: Automated build and test on every push (Linux + macOS)
+- **Release**: Build and publish binaries for both platforms when pushing tags (`v*`)
 
 ## License
 

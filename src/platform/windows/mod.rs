@@ -6,11 +6,11 @@
 
 pub mod engine;
 
-use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, GetMessageW, MSG, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx,
     WH_KEYBOARD_LL,
 };
+use tray_item::{IconSource, TrayItem};
 
 /// Starts the Windows keyboard hook and runs the message loop.
 ///
@@ -43,10 +43,28 @@ pub fn run() -> anyhow::Result<()> {
     })
     .expect("Failed to set Ctrl+C handler");
 
+    // Initialize System Tray
+    let mut tray = TrayItem::new("XKey", IconSource::Resource("tray-default"))
+        .map_err(|e| anyhow::anyhow!("Tray error: {}", e))?;
+    
+    tray.add_label("XKey Vietnamese Input")
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+        
+    let quit_hook_raw = hook_raw;
+    tray.add_menu_item("Quit", move || {
+        unsafe {
+            let _ = UnhookWindowsHookEx(windows::Win32::UI::WindowsAndMessaging::HHOOK(
+                quit_hook_raw as *mut _,
+            ));
+        }
+        std::process::exit(0);
+    })
+    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
     // Run the Windows message loop — this keeps the hook alive
     let mut msg = MSG::default();
     unsafe {
-        while GetMessageW(&mut msg, HWND::default(), 0, 0).as_bool() {
+        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
             let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }

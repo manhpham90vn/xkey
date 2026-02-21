@@ -27,6 +27,10 @@ windows = { version = "0.61", features = [
     "Win32_Foundation",
 ] }
 ctrlc = "3"
+tray-item = "0.10.0"
+
+[build-dependencies]
+embed-resource = "3.0.6"
 
 [package.metadata.deb]
 name = "xkey"

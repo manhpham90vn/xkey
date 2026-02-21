@@ -19,9 +19,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_SYSKEYDOWN,
 };
 
-/// Thread-local core state for the keyboard hook.
-/// The hook callback runs on the thread that installed the hook,
-/// so thread_local is safe.
+// Thread-local core state for the keyboard hook.
+// The hook callback runs on the thread that installed the hook,
+// so thread_local is safe.
 thread_local! {
     static CORE: RefCell<CoreState> = RefCell::new(CoreState::default());
 }
@@ -31,10 +31,10 @@ thread_local! {
 /// to let those injected events pass through.
 static SENDING: AtomicBool = AtomicBool::new(false);
 
-/// Track the number of characters currently displayed as preedit.
-/// Since Windows keyboard hook doesn't have a real preedit window,
-/// we track how many characters we've sent so we can backspace them
-/// when updating the composition.
+// Track the number of characters currently displayed as preedit.
+// Since Windows keyboard hook doesn't have a real preedit window,
+// we track how many characters we've sent so we can backspace them
+// when updating the composition.
 thread_local! {
     static PREEDIT_LEN: RefCell<usize> = RefCell::new(0);
 }
@@ -231,6 +231,7 @@ fn apply_actions(actions: Vec<Action>) -> bool {
 ///
 /// # Safety
 /// This function is called by the Windows API as a callback.
+#[allow(unsafe_op_in_unsafe_fn)]
 pub unsafe extern "system" fn keyboard_hook_proc(
     n_code: i32,
     w_param: WPARAM,
