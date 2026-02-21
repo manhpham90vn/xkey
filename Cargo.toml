@@ -5,6 +5,7 @@ edition = "2024"
 repository = "https://github.com/manhpham90vn/xkey"
 description = "A lightweight Vietnamese Telex input method for Linux (IBus), macOS (InputMethodKit), and Windows (keyboard hook)"
 license = "MIT"
+build = "windows/build.rs"
 
 [lib]
 crate-type = ["lib", "staticlib"]
