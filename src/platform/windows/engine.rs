@@ -31,6 +31,9 @@ thread_local! {
 /// to let those injected events pass through.
 static SENDING: AtomicBool = AtomicBool::new(false);
 
+/// Global switch to enable/disable Vietnamese input method.
+pub static ENABLED: AtomicBool = AtomicBool::new(true);
+
 // Track the number of characters currently displayed as preedit.
 // Since Windows keyboard hook doesn't have a real preedit window,
 // we track how many characters we've sent so we can backspace them
@@ -244,6 +247,11 @@ pub unsafe extern "system" fn keyboard_hook_proc(
 
     // Only process if nCode >= 0 (HC_ACTION)
     if n_code < 0 {
+        return CallNextHookEx(None, n_code, w_param, l_param);
+    }
+
+    // Skip processing if input method is disabled by user
+    if !ENABLED.load(Ordering::SeqCst) {
         return CallNextHookEx(None, n_code, w_param, l_param);
     }
 
