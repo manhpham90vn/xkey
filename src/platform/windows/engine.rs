@@ -196,7 +196,7 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                 if visible {
                     PREEDIT_TEXT.with(|p| {
                         let mut prev_text = p.borrow_mut();
-                        
+
                         // Find common prefix length
                         let mut common_prefix_len = 0;
                         for (c1, c2) in prev_text.chars().zip(text.chars()) {
@@ -206,17 +206,17 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                                 break;
                             }
                         }
-                        
+
                         // Backspace the non-matching part of the old text
                         let prev_len = prev_text.chars().count();
                         if prev_len > common_prefix_len {
                             send_backspaces(prev_len - common_prefix_len);
                         }
-                        
+
                         // Send the new suffix
                         let new_suffix: String = text.chars().skip(common_prefix_len).collect();
                         send_unicode_string(&new_suffix);
-                        
+
                         // Update tracking
                         *prev_text = text.clone();
                     });
@@ -235,7 +235,7 @@ fn apply_actions(actions: Vec<Action>) -> bool {
             Action::Commit(text) => {
                 PREEDIT_TEXT.with(|p| {
                     let mut prev_text = p.borrow_mut();
-                    
+
                     // Same diff logic as UpdatePreedit to minimize backspaces
                     let mut common_prefix_len = 0;
                     for (c1, c2) in prev_text.chars().zip(text.chars()) {
@@ -245,15 +245,15 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                             break;
                         }
                     }
-                    
+
                     let prev_len = prev_text.chars().count();
                     if prev_len > common_prefix_len {
                         send_backspaces(prev_len - common_prefix_len);
                     }
-                    
+
                     let new_suffix: String = text.chars().skip(common_prefix_len).collect();
                     send_unicode_string(&new_suffix);
-                    
+
                     // Clear tracking since it's committed
                     prev_text.clear();
                 });
