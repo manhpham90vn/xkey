@@ -34,12 +34,11 @@ static SENDING: AtomicBool = AtomicBool::new(false);
 /// Global switch to enable/disable Vietnamese input method.
 pub static ENABLED: AtomicBool = AtomicBool::new(true);
 
-// Track the number of characters currently displayed as preedit.
-// Since Windows keyboard hook doesn't have a real preedit window,
-// we track how many characters we've sent so we can backspace them
-// when updating the composition.
+// Track the string currently displayed as preedit.
+// We use this to calculate the common prefix between the old text
+// and the new text, only sending backspaces for the difference.
 thread_local! {
-    static PREEDIT_LEN: RefCell<usize> = const { RefCell::new(0) };
+    static PREEDIT_TEXT: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
 /// Checks if a modifier key (Ctrl, Alt, Win) is currently held down.
@@ -195,27 +194,69 @@ fn apply_actions(actions: Vec<Action>) -> bool {
         match action {
             Action::UpdatePreedit { text, visible, .. } => {
                 if visible {
-                    // Delete previous preedit characters
-                    let prev_len = PREEDIT_LEN.with(|p| *p.borrow());
-                    send_backspaces(prev_len);
-                    // Send new preedit text
-                    let new_len = text.chars().count();
-                    send_unicode_string(&text);
-                    PREEDIT_LEN.with(|p| *p.borrow_mut() = new_len);
+                    PREEDIT_TEXT.with(|p| {
+                        let mut prev_text = p.borrow_mut();
+                        
+                        // Find common prefix length
+                        let mut common_prefix_len = 0;
+                        for (c1, c2) in prev_text.chars().zip(text.chars()) {
+                            if c1 == c2 {
+                                common_prefix_len += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        
+                        // Backspace the non-matching part of the old text
+                        let prev_len = prev_text.chars().count();
+                        if prev_len > common_prefix_len {
+                            send_backspaces(prev_len - common_prefix_len);
+                        }
+                        
+                        // Send the new suffix
+                        let new_suffix: String = text.chars().skip(common_prefix_len).collect();
+                        send_unicode_string(&new_suffix);
+                        
+                        // Update tracking
+                        *prev_text = text.clone();
+                    });
                 }
             }
 
             Action::HidePreedit => {
-                let prev_len = PREEDIT_LEN.with(|p| *p.borrow());
-                send_backspaces(prev_len);
-                PREEDIT_LEN.with(|p| *p.borrow_mut() = 0);
+                PREEDIT_TEXT.with(|p| {
+                    let mut prev_text = p.borrow_mut();
+                    let prev_len = prev_text.chars().count();
+                    send_backspaces(prev_len);
+                    prev_text.clear();
+                });
             }
 
             Action::Commit(text) => {
-                let prev_len = PREEDIT_LEN.with(|p| *p.borrow());
-                send_backspaces(prev_len);
-                send_unicode_string(&text);
-                PREEDIT_LEN.with(|p| *p.borrow_mut() = 0);
+                PREEDIT_TEXT.with(|p| {
+                    let mut prev_text = p.borrow_mut();
+                    
+                    // Same diff logic as UpdatePreedit to minimize backspaces
+                    let mut common_prefix_len = 0;
+                    for (c1, c2) in prev_text.chars().zip(text.chars()) {
+                        if c1 == c2 {
+                            common_prefix_len += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    let prev_len = prev_text.chars().count();
+                    if prev_len > common_prefix_len {
+                        send_backspaces(prev_len - common_prefix_len);
+                    }
+                    
+                    let new_suffix: String = text.chars().skip(common_prefix_len).collect();
+                    send_unicode_string(&new_suffix);
+                    
+                    // Clear tracking since it's committed
+                    prev_text.clear();
+                });
             }
 
             Action::Consume => consumed = true,
