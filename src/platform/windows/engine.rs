@@ -259,6 +259,12 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                 });
             }
 
+            Action::SyncPreedit(text) => {
+                PREEDIT_TEXT.with(|p| {
+                    *p.borrow_mut() = text;
+                });
+            }
+
             Action::Consume => consumed = true,
             Action::PassThrough => {}
         }

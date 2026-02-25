@@ -110,6 +110,10 @@ impl XKey {
 
                 // Mark that we handled this key event
                 Action::Consume => consume = true,
+                Action::SyncPreedit(_) => {
+                    // IBus natively tracks passed-through keys visually,
+                    // we just ignore it the same as PassThrough without injecting text.
+                }
                 // Allow key to pass through to application
                 Action::PassThrough => {}
             }
