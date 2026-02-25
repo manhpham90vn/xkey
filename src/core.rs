@@ -38,8 +38,13 @@ pub enum Action {
     Commit(String),
 
     /// Pass the key event through to the application.
-    /// The input method did not handle this key.
+    /// The input method did not handle this key, or relies on the OS to handle it naturally.
     PassThrough,
+
+    /// Updates the internal preedit state tracker without injecting any keystrokes.
+    /// Used when we pass through the hardware key to let the OS type it, but we
+    /// still need the engine to know the current visible text state.
+    SyncPreedit(String),
 
     /// Consume the key event (prevent it from reaching the application).
     /// The input method fully handled this key.
@@ -194,9 +199,22 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
                     ];
                 }
 
-                // Regular character: add to buffer and update preedit
+                // Check if this is a simple append (e.g., standard ASCII typing)
+                let old_text = vi_transform(&core.buffer);
                 core.buffer.push(ch);
                 let text = vi_transform(&core.buffer);
+
+                // If transformation just appended the exact character we typed,
+                // we don't need to consume and inject VK_PACKET.
+                // We can let the OS handle the physical keystroke natively.
+                let is_simple_append = text.chars().count() == old_text.chars().count() + 1
+                    && text.starts_with(&old_text)
+                    && text.chars().last().map(|c| c as u32) == Some(keyval);
+
+                if is_simple_append {
+                    return vec![Action::SyncPreedit(text), Action::PassThrough];
+                }
+
                 let caret = text.chars().count();
                 return vec![
                     Action::UpdatePreedit {

@@ -81,6 +81,10 @@ unsafe fn process_actions(actions: Vec<Action>, callbacks: XKeyCallbacks) -> boo
             Action::Commit(text) => {
                 (callbacks.commit)(callbacks.context, text.as_ptr(), text.len());
             }
+            Action::SyncPreedit(_) => {
+                // macOS Native IM handles physical keystroke state naturally.
+                // We just let it pass through and do nothing here.
+            }
             Action::Consume => {
                 consumed = true;
             }
