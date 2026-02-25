@@ -81,9 +81,21 @@ unsafe fn process_actions(actions: Vec<Action>, callbacks: XKeyCallbacks) -> boo
             Action::Commit(text) => {
                 (callbacks.commit)(callbacks.context, text.as_ptr(), text.len());
             }
-            Action::SyncPreedit(_) => {
-                // macOS Native IM handles physical keystroke state naturally.
-                // We just let it pass through and do nothing here.
+            Action::SyncPreedit(text) => {
+                // On macOS (InputMethodKit), we cannot mix PassThrough with
+                // preedit composition. PassThrough lets the OS insert the char
+                // directly, which duplicates text when preedit is also active.
+                // So we treat SyncPreedit the same as UpdatePreedit + Consume:
+                // show the text in preedit and consume the key.
+                let caret = text.chars().count();
+                (callbacks.update_preedit)(
+                    callbacks.context,
+                    text.as_ptr(),
+                    text.len(),
+                    caret,
+                    true,
+                );
+                consumed = true;
             }
             Action::Consume => {
                 consumed = true;

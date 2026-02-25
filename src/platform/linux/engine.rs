@@ -110,9 +110,23 @@ impl XKey {
 
                 // Mark that we handled this key event
                 Action::Consume => consume = true,
-                Action::SyncPreedit(_) => {
-                    // IBus natively tracks passed-through keys visually,
-                    // we just ignore it the same as PassThrough without injecting text.
+                Action::SyncPreedit(text) => {
+                    // On IBus, we can't let the OS type the character directly
+                    // (PassThrough) and track it silently, because IBus preedit
+                    // is separate from committed text. If we let keys pass through
+                    // and later switch to UpdatePreedit, the already-typed chars
+                    // remain in the app, causing duplication (e.g. "too" → "tôtô").
+                    // Instead, show the text as preedit and consume the key.
+                    let caret = text.chars().count();
+                    Self::update_preedit_text(
+                        ctxt,
+                        ibus_text(text),
+                        caret as u32,
+                        true,
+                        1, // IBUS_ENGINE_PREEDIT_COMMIT
+                    )
+                    .await?;
+                    consume = true;
                 }
                 // Allow key to pass through to application
                 Action::PassThrough => {}
