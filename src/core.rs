@@ -103,7 +103,17 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
     // Pass through system shortcuts (Ctrl+X, Alt+Tab, Super+..., etc.)
     // These should be handled by the window manager, not the input method
     if is_shortcut(state) {
-        return vec![Action::PassThrough];
+        if core.buffer.is_empty() {
+            return vec![Action::PassThrough];
+        } else {
+            let text = vi_transform(&core.buffer);
+            core.buffer.clear();
+            return vec![
+                Action::Commit(text),
+                Action::HidePreedit,
+                Action::PassThrough,
+            ];
+        }
     }
 
     // X11 keysym constants for special keys
@@ -227,8 +237,24 @@ pub fn handle_key(core: &mut CoreState, keyval: u32, state: u32) -> Vec<Action> 
             }
 
             // Unrecognized key (Shift, Caps Lock, arrows, function keys, etc.)
-            // Pass through without affecting the composition
-            vec![Action::PassThrough]
+            match keyval {
+                // Modifier keys should NOT commit the buffer
+                0xffe1..=0xffee => vec![Action::PassThrough],
+                // Other unspecified keys (e.g. arrows, delete, home, end) should commit
+                _ => {
+                    if core.buffer.is_empty() {
+                        vec![Action::PassThrough]
+                    } else {
+                        let text = vi_transform(&core.buffer);
+                        core.buffer.clear();
+                        vec![
+                            Action::Commit(text),
+                            Action::HidePreedit,
+                            Action::PassThrough,
+                        ]
+                    }
+                }
+            }
         }
     }
 }
@@ -324,6 +350,41 @@ mod tests {
             actions,
             vec![
                 Action::Commit("chào".to_string()),
+                Action::HidePreedit,
+                Action::PassThrough
+            ]
+        );
+        assert!(core.buffer.is_empty());
+    }
+
+    #[test]
+    fn shortcut_commit() {
+        // Test: Pressing a shortcut (e.g., Ctrl+A) should commit the current word
+        let mut core = CoreState::default();
+        feed(&mut core, "vieetj");
+        // Simulate Ctrl+A (state = 1 << 2, keyval = 'a')
+        let actions = handle_key(&mut core, 'a' as u32, 1 << 2);
+        assert_eq!(
+            actions,
+            vec![
+                Action::Commit("việt".to_string()),
+                Action::HidePreedit,
+                Action::PassThrough
+            ]
+        );
+        assert!(core.buffer.is_empty());
+    }
+
+    #[test]
+    fn navigation_commit() {
+        // Test: Pressing a navigation key (e.g., Left Arrow = 0xff51) should commit the current word
+        let mut core = CoreState::default();
+        feed(&mut core, "vieetj");
+        let actions = handle_key(&mut core, 0xff51, 0);
+        assert_eq!(
+            actions,
+            vec![
+                Action::Commit("việt".to_string()),
                 Action::HidePreedit,
                 Action::PassThrough
             ]
