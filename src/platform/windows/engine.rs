@@ -244,7 +244,7 @@ fn apply_actions(actions: Vec<Action>) -> bool {
     if !inputs.is_empty() {
         std::thread::spawn(move || {
             let _lock = INJECT_LOCK.lock().unwrap();
-            
+
             let mut backspaces = Vec::new();
             let mut text_inputs = Vec::new();
 
@@ -264,11 +264,11 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                     SendInput(&backspaces, size_of::<INPUT>() as i32);
                 }
                 SENDING.store(false, Ordering::SeqCst);
-                
+
                 // Yield to let Chromium DOM process the deletions before receiving new characters
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
-            
+
             // 2. Send all text additions at once
             if !text_inputs.is_empty() {
                 SENDING.store(true, Ordering::SeqCst);

@@ -396,14 +396,14 @@ mod tests {
         let mut core = CoreState::default();
         let s = "howpj";
         println!("== DEBUG howpj ==");
-        
+
         let mut preedit_text = String::new();
         let mut output = String::new();
-        
+
         for ch in s.chars() {
             let actions = handle_key(&mut core, ch as u32, 0);
             println!("Key: {}", ch);
-            
+
             for action in actions {
                 match action {
                     Action::UpdatePreedit { text, visible, .. } => {
@@ -425,9 +425,12 @@ mod tests {
                             };
 
                             let new_suffix: String = text.chars().skip(common_prefix_len).collect();
-                            
-                            println!("  UpdatePreedit({:?}) -> Backspaces: {}, Add: '{}'", text, backspaces, new_suffix);
-                            
+
+                            println!(
+                                "  UpdatePreedit({:?}) -> Backspaces: {}, Add: '{}'",
+                                text, backspaces, new_suffix
+                            );
+
                             // simulate
                             if backspaces > 0 {
                                 let end = output.chars().count().saturating_sub(backspaces);
@@ -444,8 +447,12 @@ mod tests {
                         preedit_text = text.clone();
                         output.push_str(&text.chars().last().unwrap().to_string());
                     }
-                    Action::Consume => { println!("  Consume"); }
-                    Action::PassThrough => { println!("  PassThrough"); }
+                    Action::Consume => {
+                        println!("  Consume");
+                    }
+                    Action::PassThrough => {
+                        println!("  PassThrough");
+                    }
                     _ => {}
                 }
             }
