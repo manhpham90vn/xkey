@@ -391,4 +391,75 @@ mod tests {
         );
         assert!(core.buffer.is_empty());
     }
+    #[test]
+    fn test_howpj_debug() {
+        let mut core = CoreState::default();
+        let s = "howpj";
+        println!("== DEBUG howpj ==");
+
+        let mut preedit_text = String::new();
+        let mut output = String::new();
+
+        for ch in s.chars() {
+            let actions = handle_key(&mut core, ch as u32, 0);
+            println!("Key: {}", ch);
+
+            for action in actions {
+                match action {
+                    Action::UpdatePreedit { text, visible, .. } => {
+                        if visible {
+                            let mut common_prefix_len = 0;
+                            for (c1, c2) in preedit_text.chars().zip(text.chars()) {
+                                if c1 == c2 {
+                                    common_prefix_len += 1;
+                                } else {
+                                    break;
+                                }
+                            }
+
+                            let prev_len = preedit_text.chars().count();
+                            let backspaces = if prev_len > common_prefix_len {
+                                prev_len - common_prefix_len
+                            } else {
+                                0
+                            };
+
+                            let new_suffix: String = text.chars().skip(common_prefix_len).collect();
+
+                            println!(
+                                "  UpdatePreedit({:?}) -> Backspaces: {}, Add: '{}'",
+                                text, backspaces, new_suffix
+                            );
+
+                            // simulate
+                            if backspaces > 0 {
+                                let end = output.chars().count().saturating_sub(backspaces);
+                                output = output.chars().take(end).collect();
+                            }
+                            output.push_str(&new_suffix);
+
+                            preedit_text = text.clone();
+                        }
+                    }
+
+                    Action::SyncPreedit(text) => {
+                        println!("  SyncPreedit({:?})", text);
+                        preedit_text = text.clone();
+                        output.push_str(&text.chars().last().unwrap().to_string());
+                    }
+                    Action::Consume => {
+                        println!("  Consume");
+                    }
+                    Action::PassThrough => {
+                        println!("  PassThrough");
+                    }
+                    _ => {}
+                }
+            }
+            println!("  [UI State] = {}", output);
+            println!("  [Engine  ] = {}", preedit_text);
+            println!("---");
+        }
+        println!("=================");
+    }
 }

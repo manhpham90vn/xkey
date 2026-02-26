@@ -98,15 +98,9 @@ fn vk_to_keyval(vk_code: u32, scan_code: u32) -> Option<u32> {
     }
 }
 
-/// Sends backspace key events to delete `count` characters.
-fn send_backspaces(count: usize) {
-    if count == 0 {
-        return;
-    }
-
-    let mut inputs: Vec<INPUT> = Vec::with_capacity(count * 2);
+/// Appends backspace key events to the inputs vector.
+fn append_backspaces(inputs: &mut Vec<INPUT>, count: usize) {
     for _ in 0..count {
-        // Key down
         inputs.push(INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
@@ -119,7 +113,6 @@ fn send_backspaces(count: usize) {
                 },
             },
         });
-        // Key up
         inputs.push(INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
@@ -133,23 +126,11 @@ fn send_backspaces(count: usize) {
             },
         });
     }
-
-    SENDING.store(true, Ordering::SeqCst);
-    unsafe {
-        SendInput(&inputs, size_of::<INPUT>() as i32);
-    }
-    SENDING.store(false, Ordering::SeqCst);
 }
 
-/// Sends a Unicode string by injecting `SendInput` events.
-fn send_unicode_string(text: &str) {
-    if text.is_empty() {
-        return;
-    }
-
-    let mut inputs: Vec<INPUT> = Vec::new();
+/// Appends Unicode string events to the inputs vector.
+fn append_unicode_string(inputs: &mut Vec<INPUT>, text: &str) {
     for ch in text.encode_utf16() {
-        // Key down
         inputs.push(INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
@@ -162,7 +143,6 @@ fn send_unicode_string(text: &str) {
                 },
             },
         });
-        // Key up
         inputs.push(INPUT {
             r#type: INPUT_KEYBOARD,
             Anonymous: INPUT_0 {
@@ -176,19 +156,16 @@ fn send_unicode_string(text: &str) {
             },
         });
     }
-
-    SENDING.store(true, Ordering::SeqCst);
-    unsafe {
-        SendInput(&inputs, size_of::<INPUT>() as i32);
-    }
-    SENDING.store(false, Ordering::SeqCst);
 }
+
+static INJECT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Applies actions returned by `core::handle_key()`.
 ///
 /// Returns `true` if the original keystroke should be suppressed.
 fn apply_actions(actions: Vec<Action>) -> bool {
     let mut consumed = false;
+    let mut inputs: Vec<INPUT> = Vec::new();
 
     for action in actions {
         match action {
@@ -197,7 +174,6 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                     PREEDIT_TEXT.with(|p| {
                         let mut prev_text = p.borrow_mut();
 
-                        // Find common prefix length
                         let mut common_prefix_len = 0;
                         for (c1, c2) in prev_text.chars().zip(text.chars()) {
                             if c1 == c2 {
@@ -207,17 +183,14 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                             }
                         }
 
-                        // Backspace the non-matching part of the old text
                         let prev_len = prev_text.chars().count();
                         if prev_len > common_prefix_len {
-                            send_backspaces(prev_len - common_prefix_len);
+                            append_backspaces(&mut inputs, prev_len - common_prefix_len);
                         }
 
-                        // Send the new suffix
                         let new_suffix: String = text.chars().skip(common_prefix_len).collect();
-                        send_unicode_string(&new_suffix);
+                        append_unicode_string(&mut inputs, &new_suffix);
 
-                        // Update tracking
                         *prev_text = text.clone();
                     });
                 }
@@ -227,7 +200,7 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                 PREEDIT_TEXT.with(|p| {
                     let mut prev_text = p.borrow_mut();
                     let prev_len = prev_text.chars().count();
-                    send_backspaces(prev_len);
+                    append_backspaces(&mut inputs, prev_len);
                     prev_text.clear();
                 });
             }
@@ -236,7 +209,6 @@ fn apply_actions(actions: Vec<Action>) -> bool {
                 PREEDIT_TEXT.with(|p| {
                     let mut prev_text = p.borrow_mut();
 
-                    // Same diff logic as UpdatePreedit to minimize backspaces
                     let mut common_prefix_len = 0;
                     for (c1, c2) in prev_text.chars().zip(text.chars()) {
                         if c1 == c2 {
@@ -248,13 +220,12 @@ fn apply_actions(actions: Vec<Action>) -> bool {
 
                     let prev_len = prev_text.chars().count();
                     if prev_len > common_prefix_len {
-                        send_backspaces(prev_len - common_prefix_len);
+                        append_backspaces(&mut inputs, prev_len - common_prefix_len);
                     }
 
                     let new_suffix: String = text.chars().skip(common_prefix_len).collect();
-                    send_unicode_string(&new_suffix);
+                    append_unicode_string(&mut inputs, &new_suffix);
 
-                    // Clear tracking since it's committed
                     prev_text.clear();
                 });
             }
@@ -268,6 +239,45 @@ fn apply_actions(actions: Vec<Action>) -> bool {
             Action::Consume => consumed = true,
             Action::PassThrough => {}
         }
+    }
+
+    if !inputs.is_empty() {
+        std::thread::spawn(move || {
+            let _lock = INJECT_LOCK.lock().unwrap();
+
+            let mut backspaces = Vec::new();
+            let mut text_inputs = Vec::new();
+
+            for input in inputs {
+                let w_vk = unsafe { input.Anonymous.ki.wVk };
+                if w_vk == VK_BACK {
+                    backspaces.push(input);
+                } else {
+                    text_inputs.push(input);
+                }
+            }
+
+            // 1. Send all backspaces at once
+            if !backspaces.is_empty() {
+                SENDING.store(true, Ordering::SeqCst);
+                unsafe {
+                    SendInput(&backspaces, size_of::<INPUT>() as i32);
+                }
+                SENDING.store(false, Ordering::SeqCst);
+
+                // Yield to let Chromium DOM process the deletions before receiving new characters
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+
+            // 2. Send all text additions at once
+            if !text_inputs.is_empty() {
+                SENDING.store(true, Ordering::SeqCst);
+                unsafe {
+                    SendInput(&text_inputs, size_of::<INPUT>() as i32);
+                }
+                SENDING.store(false, Ordering::SeqCst);
+            }
+        });
     }
 
     consumed
