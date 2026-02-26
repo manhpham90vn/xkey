@@ -259,8 +259,83 @@ fn apply_actions(actions: Vec<Action>) -> bool {
 
             // 1. Send all backspaces at once
             if !backspaces.is_empty() {
+                let is_browser = unsafe {
+                    let hwnd = windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow();
+                    let mut buf = [0u16; 256];
+                    let len =
+                        windows::Win32::UI::WindowsAndMessaging::GetClassNameW(hwnd, &mut buf);
+                    if len > 0 {
+                        let class_name = String::from_utf16_lossy(&buf[..len as usize]);
+                        class_name.contains("Chrome_WidgetWin_1")
+                            || class_name.contains("MozillaWindowClass")
+                    } else {
+                        false
+                    }
+                };
+
+                let mut dummy_inputs = Vec::new();
+                if is_browser {
+                    // Workaround for Chrome/Edge address bar issue (Omnibox forward selection):
+                    // When a suggestion is highlighted, Backspace deletes the suggestion instead of the user's character.
+                    // Sending Space then Backspace replaces the suggestion with a space, then deletes the space,
+                    // clearing the selection so our synthetic Backspaces work as expected.
+                    dummy_inputs.push(INPUT {
+                        r#type: INPUT_KEYBOARD,
+                        Anonymous: INPUT_0 {
+                            ki: KEYBDINPUT {
+                                wVk: VK_SPACE,
+                                wScan: 0,
+                                dwFlags: Default::default(),
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    });
+                    dummy_inputs.push(INPUT {
+                        r#type: INPUT_KEYBOARD,
+                        Anonymous: INPUT_0 {
+                            ki: KEYBDINPUT {
+                                wVk: VK_SPACE,
+                                wScan: 0,
+                                dwFlags: KEYEVENTF_KEYUP,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    });
+                    dummy_inputs.push(INPUT {
+                        r#type: INPUT_KEYBOARD,
+                        Anonymous: INPUT_0 {
+                            ki: KEYBDINPUT {
+                                wVk: VK_BACK,
+                                wScan: 0,
+                                dwFlags: Default::default(),
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    });
+                    dummy_inputs.push(INPUT {
+                        r#type: INPUT_KEYBOARD,
+                        Anonymous: INPUT_0 {
+                            ki: KEYBDINPUT {
+                                wVk: VK_BACK,
+                                wScan: 0,
+                                dwFlags: KEYEVENTF_KEYUP,
+                                time: 0,
+                                dwExtraInfo: 0,
+                            },
+                        },
+                    });
+                }
+
                 SENDING.store(true, Ordering::SeqCst);
                 unsafe {
+                    if !dummy_inputs.is_empty() {
+                        SendInput(&dummy_inputs, size_of::<INPUT>() as i32);
+                        // Small pause to let the browser process the dummy keys
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                    }
                     SendInput(&backspaces, size_of::<INPUT>() as i32);
                 }
                 SENDING.store(false, Ordering::SeqCst);
